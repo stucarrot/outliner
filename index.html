@@ -1,0 +1,3256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>아웃라인 다이어그램 라이브러리</title>
+<!--
+  GitHub Pages 배포: 이 파일을 리포지토리에 index.html로 커밋한 뒤
+  Settings → Pages → Deploy from branch 로 활성화하면 바로 접속 가능합니다.
+  외부 의존성은 Google Fonts CDN 하나뿐이며, 그 외에는 순수 HTML/CSS/JS로만
+  동작하고 문서·노트 데이터는 브라우저의 localStorage에 저장됩니다.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Sans+KR:wght@400;500;700;900&family=Noto+Serif+KR:wght@400;600;700&family=Gothic+A1:wght@400;700;900&family=Jua&family=Black+Han+Sans&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<style>
+  :root {
+    --ink: #111111; --paper: #FFFFFF;
+    --gray-50: #FAFAFA; --gray-100: #F2F2F0; --gray-200: #E7E5E0; --gray-300: #D6D3CB;
+    --gray-500: #8A8680; --gray-700: #46433D; --danger: #B23A2E;
+    --ui-font: "Pretendard", -apple-system, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    --doc-font: "Noto Sans KR", var(--ui-font);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font-family: var(--ui-font); color: var(--ink); background: var(--paper); overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+  button { font-family: inherit; cursor: pointer; background: none; }
+  input, select, textarea { font-family: inherit; }
+  svg.icon { width: 15px; height: 15px; flex-shrink: 0; }
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+  .screen { display: none; flex-direction: column; flex: 1; min-height: 0; }
+  .screen.active { display: flex; }
+
+  .tbtn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--gray-300); border-radius: 7px; padding: 6px 11px; font-size: 12px; color: var(--gray-700); background: var(--paper); transition: background .12s, color .12s, border-color .12s; white-space: nowrap; }
+  .tbtn:hover { border-color: var(--ink); color: var(--ink); }
+  .tbtn.active { border-color: var(--ink); color: var(--paper); background: var(--ink); }
+  select.tbtn { appearance: none; padding-right: 24px; background-image: linear-gradient(45deg, transparent 50%, var(--gray-700) 50%), linear-gradient(135deg, var(--gray-700) 50%, transparent 50%); background-position: calc(100% - 12px) 55%, calc(100% - 7px) 55%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+  .primary-btn { display: inline-flex; align-items: center; gap: 7px; background: var(--ink); color: #fff; border-radius: 7px; padding: 8px 15px; font-size: 12px; border: none; font-weight: 600; white-space: nowrap; }
+  .primary-btn:hover { background: #000; }
+  .linklike { font-size: 11.5px; color: var(--gray-500); background: none; border: none; }
+  .linklike:hover { color: var(--ink); }
+  .eyebrow { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px; letter-spacing: .14em; color: var(--gray-500); text-transform: uppercase; }
+  .eyebrow-sm { font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--gray-500); }
+
+  /* ================= LIBRARY SCREEN ================= */
+  #libHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--gray-200); flex-wrap: wrap; }
+  .libTitleRow { display: flex; align-items: baseline; gap: 9px; }
+  .libTitle { font-size: 15px; font-weight: 700; }
+  #libTabs { display: flex; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--gray-200); }
+  #libTabs button { padding: 7px 14px; border-radius: 7px; font-size: 12.5px; font-weight: 600; color: var(--gray-500); border: 1px solid transparent; }
+  #libTabs button.active { color: var(--ink); background: var(--gray-100); border-color: var(--gray-200); }
+  #libBody { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 18px 40px; background: var(--gray-50); }
+  .libGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .libEmpty { text-align: center; color: var(--gray-500); font-size: 13px; padding: 60px 20px; line-height: 1.8; }
+  .libEmpty .primary-btn { margin: 6px; }
+  .libCard { background: var(--paper); border: 1px solid var(--gray-200); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .libCardTitle { font-size: 14px; font-weight: 700; word-break: break-word; cursor: pointer; }
+  .libCardTitle:hover { text-decoration: underline; }
+  .libCardMeta { font-size: 11px; color: var(--gray-500); font-family: ui-monospace, monospace; }
+  .libCardBtns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .libCardBtns .tbtn { padding: 5px 9px; font-size: 11px; }
+  #addDocBtn, #addNoteBtn { margin-bottom: 14px; }
+
+  .dragRow { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: 8px; margin-bottom: 6px; background: var(--paper); }
+  .dragRow.dragging { opacity: .4; }
+  .dragHandle { color: var(--gray-300); cursor: grab; flex-shrink: 0; }
+  .dragLabel { flex: 1; font-size: 13px; min-width: 0; word-break: break-word; }
+  .dragRow .icbtn { flex-shrink: 0; }
+
+  /* ================= EDITOR SCREEN ================= */
+  #toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 18px; border-bottom: 1px solid var(--gray-200); background: var(--paper); flex-shrink: 0; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+  #docTitleInput { border: 1px solid transparent; border-radius: 6px; padding: 5px 7px; font-size: 14px; font-weight: 700; color: var(--ink); background: transparent; outline: none; min-width: 60px; max-width: 260px; }
+  #docTitleInput:focus, #docTitleInput:hover { border-color: var(--gray-300); background: var(--gray-50); }
+  .toolbar-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+  #mobileTabs { display: none; border-bottom: 1px solid var(--gray-200); flex-shrink: 0; }
+  #mobileTabs button { flex: 1; padding: 11px; font-size: 13px; font-weight: 600; color: var(--gray-500); border-bottom: 2px solid transparent; background: var(--paper); }
+  #mobileTabs button.active { color: var(--ink); border-bottom-color: var(--ink); }
+
+  /* ================= ZOOM BREADCRUMB (Dynalist-style zoom-in) ================= */
+  #zoomBar { display: none; align-items: center; gap: 2px; padding: 8px 14px; border-bottom: 1px solid var(--gray-200); flex-wrap: wrap; background: var(--gray-50); flex-shrink: 0; }
+  #zoomBar.show { display: flex; }
+  #zoomBar .zcrumb { font-size: 12px; color: var(--gray-500); padding: 4px 7px; border-radius: 6px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid transparent; background: none; }
+  #zoomBar .zcrumb:hover { color: var(--ink); background: var(--gray-100); }
+  #zoomBar .zcrumb.current { color: var(--ink); font-weight: 700; }
+  #zoomBar .zsep { color: var(--gray-300); font-size: 11px; padding: 0 1px; }
+  #zoomBar .zoomOutBtn { margin-left: auto; flex-shrink: 0; }
+  .icbtn.mdActive { color: var(--ink); background: var(--gray-100); border-color: var(--gray-300); }
+
+  #main { flex: 1; min-height: 0; display: flex; }
+  #editorPane, #previewPane { display: flex; flex-direction: column; min-height: 0; }
+  #editorPane { width: 38%; min-width: 300px; border-right: 1px solid var(--gray-200); transition: none; }
+  #main.sidebar-collapsed #editorPane { display: none; }
+  body.mobile-mode #sidebarToggleBtn { display: none; }
+  #previewPane { flex: 1; min-width: 0; }
+
+  .paneSection { border-bottom: 1px solid var(--gray-200); flex-shrink: 0; }
+  .paneHead { display: flex; align-items: center; justify-content: space-between; padding: 9px 16px; font-size: 11px; color: var(--gray-700); }
+  #pasteBox { width: 100%; min-height: 130px; max-height: 220px; resize: vertical; border: 1px solid var(--gray-300); border-radius: 8px; padding: 10px 11px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; line-height: 1.55; color: var(--ink); outline: none; background: var(--gray-50); }
+  #pasteBox:focus { border-color: var(--ink); background: var(--paper); }
+  #pasteSection { border-bottom: 1px solid var(--gray-200); flex-shrink: 0; }
+  .pasteToggleBtn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 11px 16px; font-size: 12px; font-weight: 600; color: var(--gray-700); text-align: left; }
+  .pasteToggleBtn:hover { color: var(--ink); background: var(--gray-50); }
+  .pasteToggleIcon { display: inline-block; font-size: 10px; color: var(--gray-500); transition: transform .12s; width: 10px; }
+  #pasteSection.collapsed #pasteWrap { display: none; }
+  #pasteSection.collapsed .pasteToggleIcon { transform: rotate(0deg); }
+  #pasteSection:not(.collapsed) .pasteToggleIcon { transform: rotate(90deg); }
+  #pasteWrap { padding: 0 16px 14px; }
+  #listToolbar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--gray-200); flex-shrink: 0; }
+  #multiSelectToggle { font-size: 11px; padding: 5px 10px; }
+
+  #floatZoom { position: absolute; right: 14px; bottom: 14px; display: flex; align-items: center; gap: 3px; background: var(--gray-100); border: 1px solid var(--gray-300); border-radius: 20px; padding: 4px 6px; box-shadow: 0 1px 4px rgba(0,0,0,.08); z-index: 3; }
+  #floatZoom button { width: 24px; height: 24px; border-radius: 50%; color: var(--gray-700); display: flex; align-items: center; justify-content: center; }
+  #floatZoom button:hover { color: var(--ink); background: var(--gray-100); }
+  #floatZoom .zoomlbl { font-family: ui-monospace, monospace; font-size: 10.5px; color: var(--gray-700); width: 34px; text-align: center; }
+
+  #selectionBar { display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; background: var(--ink); color: #fff; align-items: center; justify-content: space-between; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); gap: 10px; flex-wrap: wrap; }
+  #selectionBar.show { display: flex; }
+  #selectionBar .selCount { font-size: 12.5px; font-weight: 600; }
+  #selectionBar .selBtns { display: flex; gap: 8px; flex-wrap: wrap; }
+  #selectionBar button.selBtn { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.25); border-radius: 7px; padding: 7px 12px; font-size: 12px; }
+  #selectionBar button.selBtn:hover { background: rgba(255,255,255,.22); }
+  #selectionBar button.selBtn.primary { background: #fff; color: var(--ink); font-weight: 700; }
+  body.mobile-mode #selectionBar { padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+
+  #importBtn { margin-top: 8px; width: 100%; justify-content: center; }
+  .paste-hint { font-size: 11px; color: var(--gray-500); line-height: 1.5; margin-top: 8px; }
+
+  #listScroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 8px 90px; }
+  .lrow { display: flex; align-items: center; gap: 4px; padding: 3px 0; border-radius: 5px; }
+  .lrow.focused { background: var(--gray-100); }
+  .lrow .lguides { display: flex; flex-shrink: 0; }
+  .lrow .lguide { width: 16px; position: relative; flex-shrink: 0; height: 28px; }
+  .lrow .lguide::before { content: ""; position: absolute; left: 7px; top: 0; bottom: 0; width: 1px; background: var(--gray-200); }
+  .lrow .lvl { font-family: ui-monospace, monospace; font-size: 9px; color: var(--gray-300); width: 14px; flex-shrink: 0; text-align: center; }
+  .lrow input.ltext { flex: 1; min-width: 0; border: none; border-bottom: 1px solid transparent; background: transparent; outline: none; font-size: 14px; color: var(--ink); padding: 5px 3px; font-family: var(--doc-font); }
+  .lrow input.ltext:focus { border-bottom-color: var(--ink); }
+  .lrow .lbtns { display: flex; gap: 1px; flex-shrink: 0; }
+  .icbtn { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 5px; color: var(--gray-500); border: 1px solid transparent; flex-shrink: 0; }
+  .icbtn:hover { color: var(--ink); background: var(--gray-100); }
+  .icbtn svg { width: 12px; height: 12px; }
+  .icbtn.danger:hover { color: var(--danger); }
+  .lrow .badge { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .lrow .dragHandleSm { color: var(--gray-300); cursor: grab; flex-shrink: 0; width: 13px; display: flex; align-items: center; justify-content: center; }
+  .lrow .dragHandleSm:hover { color: var(--gray-500); }
+  .lrow .dragHandleSm svg { width: 11px; height: 11px; }
+  .lrow.dragging { opacity: .4; }
+  .lrow.dragOver-before { box-shadow: inset 0 2px 0 var(--ink); }
+  .lrow.dragOver-after { box-shadow: inset 0 -2px 0 var(--ink); }
+  .lrow .foldBtn { width: 15px; height: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--gray-500); border-radius: 3px; font-size: 9px; border: none; background: none; }
+  .lrow .foldBtn:hover { color: var(--ink); background: var(--gray-100); }
+  .lrow .foldSpacer { width: 15px; flex-shrink: 0; }
+  #diagramModeToggle.active { border-color: var(--ink); color: var(--paper); background: var(--ink); }
+  #addRootBtn { display: inline-flex; align-items: center; gap: 6px; border: 1px dashed var(--gray-300); color: var(--gray-700); background: var(--paper); border-radius: 7px; padding: 8px 12px; font-size: 12px; margin: 8px 4px 0; width: calc(100% - 8px); justify-content: center; transition: border-color .12s, color .12s; }
+  #addRootBtn:hover { border-color: var(--ink); color: var(--ink); }
+
+  #svgOuter { flex: 1; min-height: 0; position: relative; display: flex; }
+  #svgWrap { flex: 1; min-height: 0; overflow: auto; padding: 24px; background: var(--gray-50); }
+  #canvasFrame { position: relative; display: inline-block; border: 1px solid var(--gray-200); box-shadow: 0 1px 2px rgba(0,0,0,.05); background: #fff; }
+  .crop { position: absolute; width: 10px; height: 10px; border: 0 solid var(--ink); z-index: 2; opacity: .5; }
+  .crop.nw { top: -1px; left: -1px; border-top-width: 1.5px; border-left-width: 1.5px; }
+  .crop.ne { top: -1px; right: -1px; border-top-width: 1.5px; border-right-width: 1.5px; }
+  .crop.sw { bottom: -1px; left: -1px; border-bottom-width: 1.5px; border-left-width: 1.5px; }
+  .crop.se { bottom: -1px; right: -1px; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+
+  #previewFoot { display: flex; align-items: center; justify-content: space-between; padding: 11px 18px; border-top: 1px solid var(--gray-200); background: var(--paper); flex-shrink: 0; gap: 10px; flex-wrap: wrap; }
+  .dims { font-family: ui-monospace, monospace; font-size: 10px; color: var(--gray-500); }
+  .zoomctl { display: flex; align-items: center; gap: 3px; }
+  .zoomctl button { width: 26px; height: 26px; border: 1px solid var(--gray-300); border-radius: 6px; color: var(--gray-700); display: flex; align-items: center; justify-content: center; }
+  .zoomctl button:hover { border-color: var(--ink); color: var(--ink); }
+  .zoomlbl { font-family: ui-monospace, monospace; font-size: 11px; color: var(--gray-700); width: 38px; text-align: center; }
+  .lw-ctl { display: flex; align-items: center; gap: 6px; }
+  .lw-ctl label { font-size: 11px; color: var(--gray-500); font-family: ui-monospace, monospace; }
+  .lw-ctl input[type=range] { width: 64px; accent-color: var(--ink); }
+  .lw-ctl .lwval { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink); width: 14px; }
+  #canvasWidthVal { width: 44px; text-align: left; }
+  #canvasWidthRange { width: 84px; }
+
+  #mobileBar { display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--paper); border-top: 1px solid var(--gray-200); padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px)); gap: 2px; box-shadow: 0 -2px 10px rgba(0,0,0,.05); }
+  #mobileBar.show { display: flex; }
+  #mobileBar button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 8px 2px; border-radius: 9px; color: var(--ink); font-size: 9px; border: 1px solid transparent; }
+  #mobileBar button:active { background: var(--gray-100); border-color: var(--gray-300); }
+  #mobileBar button svg { width: 18px; height: 18px; }
+
+  /* ================= NOTEBOOK VIEWER SCREEN ================= */
+  #nbHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 18px; border-bottom: 1px solid var(--gray-200); flex-shrink: 0; }
+  #nbHeaderLeft { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  #nbTitle { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #nbPageIndicator { font-family: ui-monospace, monospace; font-size: 11px; color: var(--gray-500); }
+  #nbViewport { flex: 1; min-height: 0; position: relative; background: var(--gray-50); }
+  #nbPages { height: 100%; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; }
+  .nbPage { flex: 0 0 100%; scroll-snap-align: center; display: flex; align-items: center; justify-content: center; padding: 30px 50px; position: relative; }
+  .nbPage svg { max-width: 100%; max-height: 100%; width: auto; height: auto; background: #fff; border: 1px solid var(--gray-200); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .nbPageTitle { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--gray-500); font-family: ui-monospace, monospace; background: rgba(255,255,255,.85); padding: 3px 10px; border-radius: 12px; }
+  .nbMissing { color: var(--gray-500); font-size: 13px; }
+  .nbNav { position: absolute; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--gray-300); background: rgba(255,255,255,.9); display: flex; align-items: center; justify-content: center; color: var(--ink); z-index: 5; }
+  .nbNav:hover { border-color: var(--ink); }
+  #nbPrev { left: 12px; } #nbNext { right: 12px; }
+  #nbEmpty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--gray-500); font-size: 13px; }
+
+  /* ================= modals ================= */
+  .overlay { position: fixed; inset: 0; background: rgba(17,17,17,.4); z-index: 40; display: none; align-items: flex-end; justify-content: center; }
+  .overlay.show { display: flex; }
+  .modalPanel { width: 100%; max-width: 420px; max-height: 88%; overflow-y: auto; background: #fff; border: 1px solid var(--gray-200); border-radius: 16px 16px 0 0; padding: 20px; }
+  .modalPanel.wide { max-width: 620px; }
+  @media (min-width: 640px) { .overlay { align-items: center; } .modalPanel { border-radius: 14px; } }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .modal-section { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--gray-100); }
+  .modal-section:last-of-type { border-bottom: none; margin-bottom: 4px; }
+  .modal-section-title { font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 10px; display: block; }
+  .level-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .level-row .lname { width: 56px; flex-shrink: 0; font-family: ui-monospace, monospace; font-size: 12px; color: var(--gray-700); }
+  .level-row input[type=range] { flex: 1; accent-color: var(--ink); }
+  .level-row .lval { width: 30px; text-align: right; font-family: ui-monospace, monospace; font-size: 12px; }
+  .level-row label.chk { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--gray-700); flex-shrink: 0; }
+  .level-row label.chk input { accent-color: var(--ink); }
+  .hint { font-size: 11.5px; color: var(--gray-500); line-height: 1.6; margin-top: 4px; }
+  .close-x { color: var(--gray-700); background: none; border: none; }
+  .close-x:hover { color: var(--ink); }
+
+  .npField { margin-bottom: 14px; }
+  .npLabelRow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .npLabel { font-size: 12px; font-weight: 600; color: var(--ink); }
+  .npToggle { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--gray-700); }
+  .npToggle input { accent-color: var(--ink); }
+  .npInput, .npTextarea, .npSelect { width: 100%; border: 1px solid var(--gray-300); border-radius: 7px; padding: 7px 9px; font-size: 13px; color: var(--ink); outline: none; font-family: var(--ui-font); background: var(--paper); }
+  .npInput:focus, .npTextarea:focus, .npSelect:focus { border-color: var(--ink); }
+  .npTextarea { resize: vertical; min-height: 50px; font-family: var(--doc-font); }
+  .npRow2 { display: flex; gap: 8px; }
+  .npRow2 > div { flex: 1; }
+  .npColorRow { display: flex; align-items: center; gap: 8px; }
+  .npColorRow input[type=color] { width: 34px; height: 30px; border: 1px solid var(--gray-300); border-radius: 6px; padding: 2px; background: none; }
+  .npSmallNum { width: 100%; }
+  .npSwatches { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .swatch { width: 20px; height: 20px; border-radius: 5px; border: 1px solid var(--gray-300); cursor: pointer; }
+  .shapeSwatches { display: flex; gap: 6px; margin-top: 8px; }
+  .shapeBtn { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--gray-300); display: flex; align-items: center; justify-content: center; color: var(--gray-700); }
+  .shapeBtn.active { border-color: var(--ink); color: var(--ink); background: var(--gray-100); }
+  .npDangerBtn { color: var(--danger); font-size: 12px; border: 1px solid var(--gray-300); border-radius: 7px; padding: 7px 10px; width: 100%; }
+  .npDangerBtn:hover { border-color: var(--danger); background: #FBEDEB; }
+  .npResetBtn, .npSecondaryBtn { color: var(--gray-700); font-size: 12px; border: 1px solid var(--gray-300); border-radius: 7px; padding: 7px 10px; width: 100%; margin-top: 8px; }
+
+  .menuList { display: flex; flex-direction: column; margin-bottom: 6px; }
+  .menuDivider { font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--gray-500); padding: 14px 4px 6px; }
+  .menuDivider:first-child { padding-top: 4px; }
+  .menuRow { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 11px 4px; border: none; background: none; text-align: left; font-size: 13.5px; color: var(--ink); border-bottom: 1px solid var(--gray-100); gap: 8px; }
+  .menuRow:hover { background: var(--gray-50); }
+  .menuRowLabel { font-weight: 500; }
+  .menuRowRight { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .menuRowHint { font-size: 11px; color: var(--gray-500); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .menuRowChevron { color: var(--gray-300); display: flex; flex-shrink: 0; }
+  .menuRowChevron svg { width: 14px; height: 14px; }
+  .menuToggleRow { display: flex; align-items: center; justify-content: space-between; padding: 11px 4px; border-bottom: 1px solid var(--gray-100); font-size: 13.5px; color: var(--ink); cursor: pointer; }
+  .menuToggleRow input[type=checkbox] { accent-color: var(--ink); width: 17px; height: 17px; flex-shrink: 0; }
+  .detailBackRow { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .detailBackBtn { display: flex; align-items: center; gap: 4px; color: var(--gray-700); font-size: 12px; font-weight: 600; padding: 4px 2px; }
+  .detailBackBtn:hover { color: var(--ink); }
+  .detailBackBtn svg { width: 15px; height: 15px; }
+  .detailTitle { flex: 1; text-align: center; font-size: 13px; font-weight: 700; color: var(--ink); }
+  .npResetBtn:hover, .npSecondaryBtn:hover { border-color: var(--ink); color: var(--ink); }
+
+  .addDocList { max-height: 180px; overflow-y: auto; border: 1px solid var(--gray-200); border-radius: 8px; padding: 6px; margin-bottom: 12px; }
+  .addDocRow { display: flex; align-items: center; gap: 8px; padding: 6px 6px; font-size: 12.5px; }
+  .addDocRow label { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  .addDocRow input[type=checkbox] { accent-color: var(--ink); flex-shrink: 0; }
+
+  /* ================= MD NOTE POPUP ================= */
+  .mdModalPanel { max-width: 780px; width: 94%; height: 88vh; max-height: 860px; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+  .mdModalHead { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--gray-200); flex-shrink: 0; }
+  .mdModalTitle { font-size: 14px; font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mdModalTabs { display: flex; gap: 6px; flex-shrink: 0; }
+  .mdModalBody { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px; }
+  .mdModalFoot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--gray-200); flex-shrink: 0; flex-wrap: wrap; }
+  #mdEditArea { width: 100%; height: 100%; min-height: 320px; border: 1px solid var(--gray-300); border-radius: 8px; padding: 14px 16px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; line-height: 1.65; color: var(--ink); outline: none; resize: none; background: var(--gray-50); }
+  #mdEditArea:focus { border-color: var(--ink); background: var(--paper); }
+  .mdEditWrap { display: flex; flex-direction: column; height: 100%; gap: 8px; }
+  .mdEditToolbar { display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0; }
+  .mdEditWrap #mdEditArea { flex: 1; min-height: 0; }
+  .mdEmpty { color: var(--gray-500); font-size: 13px; text-align: center; padding: 70px 20px; line-height: 1.8; }
+  .mdRender { font-family: var(--doc-font); font-size: 14.5px; line-height: 1.8; color: var(--ink); word-break: break-word; }
+  .mdRender h1, .mdRender h2, .mdRender h3, .mdRender h4 { font-family: var(--ui-font); font-weight: 800; line-height: 1.4; }
+  .mdRender h1 { font-size: 1.6em; margin: .2em 0 .5em; padding-bottom: .3em; border-bottom: 1px solid var(--gray-200); }
+  .mdRender h2 { font-size: 1.35em; margin: 1.1em 0 .5em; }
+  .mdRender h3 { font-size: 1.15em; margin: 1em 0 .4em; }
+  .mdRender h4 { font-size: 1.02em; margin: .9em 0 .4em; }
+  .mdRender p { margin: .65em 0; }
+  .mdRender ul, .mdRender ol { margin: .5em 0; padding-left: 1.5em; }
+  .mdRender li { margin: .3em 0; }
+  .mdRender li > p { margin: .2em 0; }
+  .mdRender blockquote { margin: .8em 0; padding: .5em 1em; border-left: 3px solid var(--gray-300); color: var(--gray-700); background: var(--gray-50); border-radius: 0 6px 6px 0; }
+  .mdRender code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .88em; background: var(--gray-100); padding: .15em .4em; border-radius: 4px; }
+  .mdRender pre { background: var(--gray-100); padding: 12px 15px; border-radius: 8px; overflow-x: auto; margin: .8em 0; }
+  .mdRender pre code { background: none; padding: 0; font-size: .85em; }
+  .mdRender table { border-collapse: collapse; margin: .9em 0; font-size: .92em; display: block; overflow-x: auto; }
+  .mdRender th, .mdRender td { border: 1px solid var(--gray-300); padding: 6px 12px; }
+  .mdRender th { background: var(--gray-50); font-weight: 700; }
+  .mdRender img { max-width: 100%; border-radius: 6px; }
+  .mdRender a { color: #2B6CB0; text-decoration: underline; }
+  .mdRender hr { border: none; border-top: 1px solid var(--gray-200); margin: 1.3em 0; }
+  .mdRender input[type=checkbox] { accent-color: var(--ink); margin-right: 4px; }
+
+  body.mobile-mode #mobileTabs { display: flex; }
+  body.mobile-mode #main { flex-direction: column; }
+  body.mobile-mode #editorPane, body.mobile-mode #previewPane { width: 100%; min-width: 0; border-right: none; display: none; flex: 1; }
+  body.mobile-mode.tab-edit #editorPane { display: flex; }
+  body.mobile-mode.tab-preview #previewPane { display: flex; }
+  body.mobile-mode .lrow input.ltext { font-size: 16px; padding: 8px 4px; }
+  body.mobile-mode #listScroll { padding-bottom: 84px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= LIBRARY ================= -->
+  <div id="screenLibrary" class="screen">
+    <div id="libHeader">
+      <div class="libTitleRow"><span class="eyebrow">LIBRARY</span><span class="libTitle">다이어그램 라이브러리</span></div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button id="libBackupBtn" class="tbtn"></button>
+        <button id="libImportBtn" class="tbtn"></button>
+      </div>
+    </div>
+    <input type="file" id="libraryImportFile" accept=".json,application/json" style="display:none">
+    <input type="file" id="docImportFile" accept=".json,application/json" style="display:none">
+    <div id="libTabs">
+      <button data-tab="docs" class="active">문서</button>
+      <button data-tab="notes">노트</button>
+    </div>
+    <div id="libBody"></div>
+  </div>
+
+  <!-- ================= EDITOR ================= -->
+  <div id="screenEditor" class="screen">
+    <div id="toolbar">
+      <div class="brand">
+        <button id="backToLibBtn" class="tbtn" title="라이브러리로"></button>
+        <input id="docTitleInput" type="text" placeholder="제목 없음" />
+      </div>
+      <div class="toolbar-right">
+        <button id="saveDocBtn" class="primary-btn"></button>
+        <select id="fontSelect" class="tbtn" title="글꼴 선택"></select>
+        <button id="diagramModeToggle" class="tbtn" title="다이어그램 구조: 가로로 넓어지는 트리 ↔ 세로로 들여쓰는 아웃라인"></button>
+        <button id="mobileToggle" class="tbtn" title="모바일 최적화 모드 전환"></button>
+        <button id="sidebarToggleBtn" class="tbtn" title="아웃라인 사이드바 접기/펼치기"></button>
+        <button id="settingsBtn" class="tbtn" title="폰트 크기 · 굵기 · 연결선 굵기 · 표시 범위"></button>
+      </div>
+    </div>
+
+    <div id="mobileTabs">
+      <button data-tab="edit" class="active">편집</button>
+      <button data-tab="preview">다이어그램</button>
+    </div>
+
+    <div id="zoomBar"></div>
+
+    <div id="main">
+      <div id="editorPane">
+        <div id="pasteSection" class="collapsed">
+          <button id="pasteToggle" class="pasteToggleBtn">
+            <span id="pasteToggleIcon" class="pasteToggleIcon">▸</span>
+            <span>아웃라인 붙여넣기</span>
+          </button>
+          <div id="pasteWrap">
+            <textarea id="pasteBox" spellcheck="false" placeholder="다이날리스트에서 'Copy as Formatted'로 복사한 내용을 여기에 붙여넣으세요."></textarea>
+            <button id="importBtn" class="primary-btn"></button>
+            <p class="paste-hint">탭(또는 하이픈 들여쓰기)으로 된 다이날리스트 · 워크플로위 형식 텍스트를 인식합니다. 항목에 딸린 노트(메모) 줄은 자동으로 작은 글씨 메모로 들어갑니다.</p>
+          </div>
+        </div>
+        <div id="listToolbar">
+          <button id="multiSelectToggle" class="tbtn"></button>
+          <div style="display:flex; gap:12px;">
+            <button id="demoBtn" class="linklike">예시</button>
+            <button id="clearBtn" class="linklike" style="color:var(--danger)">전체 지우기</button>
+          </div>
+        </div>
+        <div id="listScroll">
+          <div id="listBody"></div>
+          <button id="addRootBtn">+ 최상위 항목 추가</button>
+        </div>
+      </div>
+      <div id="previewPane">
+        <div id="svgOuter">
+          <div id="svgWrap">
+            <div id="canvasFrame">
+              <span class="crop nw"></span><span class="crop ne"></span><span class="crop sw"></span><span class="crop se"></span>
+              <svg id="treeSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+            </div>
+          </div>
+          <div id="floatZoom">
+            <button id="zoomOut">−</button>
+            <span class="zoomlbl" id="zoomLbl">100%</span>
+            <button id="zoomIn">+</button>
+            <button id="zoomReset" title="100%로"></button>
+          </div>
+        </div>
+        <div id="previewFoot">
+          <span class="dims" id="dimsLbl">0 × 0 px</span>
+          <div class="lw-ctl">
+            <label>선 굵기</label>
+            <input type="range" id="lineWidthRange" min="1" max="8" step="0.5" value="1">
+            <span class="lwval" id="lineWidthVal">1</span>
+          </div>
+          <div class="lw-ctl">
+            <label>캔버스 폭</label>
+            <input type="range" id="canvasWidthRange" min="0" max="500" step="10" value="0">
+            <span class="lwval" id="canvasWidthVal">무제한</span>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+            <select id="outlineExportFormat" class="tbtn" title="내보낼 텍스트 형식">
+              <option value="bullets">불렛 마크다운</option>
+              <option value="md-headers">마크다운 헤더(#)</option>
+              <option value="indent">들여쓰기 텍스트</option>
+            </select>
+            <label style="display:flex; align-items:center; gap:5px; font-size:12px; color:var(--gray-600); cursor:pointer;" title="맨 위(최상위) 항목은 제외하고 하위 항목부터 내보내기">
+              <input type="checkbox" id="exportOmitRootChk" style="accent-color:var(--ink);">최상위 제외
+            </label>
+            <button id="exportOutlineCopyBtn" class="tbtn" title="클립보드로 복사">복사</button>
+            <button id="exportOutlineBtn" class="tbtn" title="현재 아웃라인을 텍스트 파일로 내보내기">파일로</button>
+            <button id="exportSvgBtn" class="tbtn">SVG</button>
+            <button id="exportPngBtn" class="primary-btn"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="mobileBar"></div>
+    <div id="selectionBar"></div>
+  </div>
+
+  <!-- ================= NOTEBOOK VIEWER ================= -->
+  <div id="screenNotebook" class="screen">
+    <div id="nbHeader">
+      <div id="nbHeaderLeft">
+        <button id="nbBackBtn" class="tbtn" title="라이브러리로"></button>
+        <span id="nbTitle">노트</span>
+        <span id="nbPageIndicator">0 / 0</span>
+      </div>
+      <button id="nbTocBtn" class="tbtn"></button>
+    </div>
+    <div id="nbViewport">
+      <div id="nbPages"></div>
+      <div id="nbEmpty" style="display:none;">이 노트에는 아직 문서가 없습니다. 목차에서 문서를 추가하세요.</div>
+      <button id="nbPrev" class="nbNav"></button>
+      <button id="nbNext" class="nbNav"></button>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay"><div class="modalPanel" id="settingsPanel"></div></div>
+  <div class="overlay" id="nodeOverlay"><div class="modalPanel" id="nodePanel"></div></div>
+  <div class="overlay" id="notebookEditOverlay"><div class="modalPanel wide" id="notebookEditPanel"></div></div>
+  <div class="overlay" id="nbTocOverlay"><div class="modalPanel" id="nbTocPanel"></div></div>
+  <div class="overlay" id="bulkOverlay"><div class="modalPanel" id="bulkPanel"></div></div>
+  <div class="overlay" id="importOverlay"><div class="modalPanel" id="importPanel"></div></div>
+  <div class="overlay" id="mdOverlay"><div class="modalPanel mdModalPanel" id="mdPanel"></div></div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------------
+  // storage (graceful fallback to in-memory if localStorage is blocked,
+  // e.g. inside a sandboxed preview)
+  // ---------------------------------------------------------------------
+  var memStore = {};
+  function safeGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return Object.prototype.hasOwnProperty.call(memStore, k) ? memStore[k] : null; } }
+  function safeSet(k, v) { try { window.localStorage.setItem(k, v); } catch (e) { memStore[k] = v; } }
+  var LIB_KEY = "outlineTreeLibrary_v1";
+
+  function loadLibrary() {
+    var raw = safeGet(LIB_KEY);
+    var base = { documents: {}, notebooks: {}, documentOrder: [], notebookOrder: [] };
+    if (!raw) return base;
+    try { return Object.assign(base, JSON.parse(raw)); } catch (e) { return base; }
+  }
+  function saveLibrary() { safeSet(LIB_KEY, JSON.stringify(state.library)); }
+  function fmtDate(ts) {
+    var d = new Date(ts);
+    function p(n) { return String(n).padStart(2, "0"); }
+    return d.getFullYear() + "." + p(d.getMonth() + 1) + "." + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+  function newDocId() { return "doc_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7); }
+  function newNbId() { return "nb_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7); }
+  function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---------------------------------------------------------------------
+  // icons
+  // ---------------------------------------------------------------------
+  function icon(inner) { return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>'; }
+  var ICONS = {
+    indent: icon('<path d="M9 6l6 6-6 6"/><line x1="3" y1="4" x2="3" y2="20"/>'),
+    outdent: icon('<path d="M15 6l-6 6 6 6"/><line x1="21" y1="4" x2="21" y2="20"/>'),
+    up: icon('<polyline points="6 15 12 9 18 15"/>'),
+    down: icon('<polyline points="6 9 12 15 18 9"/>'),
+    trash: icon('<polyline points="4 7 6.5 7 20 7"/><path d="M18.2 7 17.3 19.5a2 2 0 0 1-2 1.8H8.7a2 2 0 0 1-2-1.8L5.8 7"/><line x1="10" y1="11" x2="10" y2="16"/><line x1="14" y1="11" x2="14" y2="16"/><path d="M9 7V4.8A1 1 0 0 1 10 4h4a1 1 0 0 1 1 .8V7"/>'),
+    x: icon('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'),
+    smartphone: icon('<rect x="6" y="2.5" width="12" height="19" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>'),
+    monitor: icon('<rect x="2.5" y="4" width="19" height="13" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'),
+    settings: icon('<circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V19.6a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.96 18a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87A1.7 1.7 0 0 0 3 12.04H2.9a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 6.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 2.6H9a1.7 1.7 0 0 0 1.04-1.56V.95a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 2.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 7a1.7 1.7 0 0 0 1.56 1.04h.09a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 13.5z"/>'),
+    maximize: icon('<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>'),
+    download: icon('<path d="M21 15v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'),
+    upload: icon('<path d="M21 15v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>'),
+    save: icon('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>'),
+    back: icon('<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>'),
+    list: icon('<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>'),
+    grip: icon('<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>'),
+    chevL: icon('<polyline points="15 18 9 12 15 6"/>'),
+    chevR: icon('<polyline points="9 18 15 12 9 6"/>'),
+    branch: icon('<line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>'),
+    sidebar: icon('<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>'),
+    chevRightSmall: icon('<polyline points="9 18 15 12 9 6"/>'),
+    edit: icon('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
+    zoomin: icon('<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>'),
+    note: icon('<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/>'),
+  };
+
+  // ---------------------------------------------------------------------
+  // fonts / palettes
+  // ---------------------------------------------------------------------
+  var FONTS = [
+    { id: "system", label: "시스템 기본", css: 'system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif', weight400: 400, weight700: 700 },
+    { id: "noto-sans", label: "Noto Sans KR", css: '"Noto Sans KR", sans-serif', weight400: 400, weight700: 700 },
+    { id: "nanum-gothic", label: "나눔고딕", css: '"Nanum Gothic", sans-serif', weight400: 400, weight700: 700 },
+    { id: "nanum-myeongjo", label: "나눔명조", css: '"Nanum Myeongjo", serif', weight400: 400, weight700: 700 },
+    { id: "noto-serif", label: "Noto Serif KR", css: '"Noto Serif KR", serif', weight400: 400, weight700: 700 },
+    { id: "gothic-a1", label: "Gothic A1", css: '"Gothic A1", sans-serif', weight400: 400, weight700: 700 },
+    { id: "jua", label: "Jua (둥근)", css: '"Jua", sans-serif', weight400: 400, weight700: 400 },
+    { id: "black-han", label: "Black Han Sans (제목용)", css: '"Black Han Sans", sans-serif', weight400: 400, weight700: 400 },
+    { id: "mono", label: "고정폭", css: 'ui-monospace, "SF Mono", Menlo, monospace', weight400: 400, weight700: 700 },
+  ];
+  var DEFAULT_LEVEL_SIZE = 20;
+  var DEFAULT_LEVEL_BOLD = false;
+  var HIGHLIGHT_SWATCHES = ["#FFF07A", "#B9F1B0", "#AEE0FF", "#FFC9DE", "#E3D2FF"];
+  var BOX_SWATCHES = ["#FFFFFF", "#111111", "#F2F2F0", "#DDEBFF", "#FDE7D3", "#E6F4E0"];
+  var BADGE_SWATCHES = ["#E5484D", "#F5A623", "#3DCC66", "#3B82F6", "#8B5CF6", "#6B7280"];
+  var BADGE_SHAPES = ["circle", "square", "diamond", "triangle"];
+
+  // ---------------------------------------------------------------------
+  // state
+  // ---------------------------------------------------------------------
+  var uidCounter = 1;
+  function nextId() { return "n" + (uidCounter++); }
+  function demoText() { return "- 가\n\t- 나\n\t- 다\n\t\t- 라\n\t- 마"; }
+
+  var state = {
+    view: "library",           // 'library' | 'editor' | 'notebook'
+    libTab: "docs",
+    library: loadLibrary(),
+    currentDocId: null,
+    currentDocTitle: "",
+    items: [],
+    fontId: "noto-sans",
+    levelSettings: {},
+    mobileMode: window.innerWidth < 768,
+    mobileTab: "edit",
+    focusedId: null,
+    selectedId: null,
+    nodePanelView: "menu",
+    zoom: 1,
+    lineWidth: 1,
+    omitRootTitle: false,
+    maxDisplayLevel: null,
+    notebookViewer: { notebookId: null },
+    canvasMaxTextWidth: null,
+    multiSelectMode: false,
+    selectedIds: new Set(),
+    zoomRootId: null,     // Dynalist-style zoom-in: id of item currently shown as top level (null = whole document)
+    diagramMode: "tree",  // 'tree' = 가로로 넓어지는 트리, 'vertical' = 일정 폭씩 들여쓰며 수직으로 내려가는 아웃라인
+  };
+  var mdPopupState = { id: null, mode: "preview" };
+
+  function getItemById(id) { for (var i = 0; i < state.items.length; i++) if (state.items[i].id === id) return state.items[i]; return null; }
+  function getLevelSetting(level) { return state.levelSettings[level] || { size: DEFAULT_LEVEL_SIZE, bold: DEFAULT_LEVEL_BOLD }; }
+  function maxLevel() { var m = 0; for (var i = 0; i < state.items.length; i++) m = Math.max(m, state.items[i].level); return m; }
+  function currentFont() { for (var i = 0; i < FONTS.length; i++) if (FONTS[i].id === state.fontId) return FONTS[i]; return FONTS[0]; }
+
+  // ---------------------------------------------------------------------
+  // Dynalist / Workflowy formatted-text importer
+  // ---------------------------------------------------------------------
+  function parseOutlineText(raw) {
+    var rawLines = raw.replace(/\r\n/g, "\n").split("\n");
+    var lines = [];
+    rawLines.forEach(function (l) {
+      if (l.trim() === "") return;
+      var indentMatch = l.match(/^[\t ]*/)[0];
+      var content = l.slice(indentMatch.length);
+      lines.push({ indent: indentMatch, content: content });
+    });
+    if (lines.length === 0) return [];
+    var spaceCounts = lines.map(function (l) { return l.indent.replace(/\t/g, "").length; }).filter(function (n) { return n > 0; });
+    var spaceStep = spaceCounts.length ? Math.min.apply(null, spaceCounts) : 2;
+    if (spaceStep === 0) spaceStep = 2;
+    function levelOf(indentStr) {
+      var tabCount = (indentStr.match(/\t/g) || []).length;
+      var spaceCount = indentStr.replace(/\t/g, "").length;
+      var lvl = tabCount;
+      if (spaceCount > 0) lvl += Math.round(spaceCount / spaceStep);
+      return lvl;
+    }
+    var bulletRe = /^[-*•]\s+(.*)$/;
+    var bulletCount = lines.filter(function (l) { return bulletRe.test(l.content); }).length;
+    var bulletFormat = bulletCount >= Math.ceil(lines.length * 0.4);
+    var items = [];
+    lines.forEach(function (l) {
+      var lvl = levelOf(l.indent);
+      var m = l.content.match(bulletRe);
+      if (bulletFormat && m) {
+        var text = m[1].trim();
+        var checkbox = text.match(/^\[( |x|X)\]\s*(.*)$/);
+        if (checkbox) text = (checkbox[1].toLowerCase() === "x" ? "☑ " : "☐ ") + checkbox[2];
+        items.push({ id: nextId(), text: text, level: lvl, note: "" });
+      } else if (bulletFormat && !m) {
+        if (items.length > 0) {
+          var prev = items[items.length - 1];
+          prev.note = prev.note ? (prev.note + "\n" + l.content.trim()) : l.content.trim();
+        } else { items.push({ id: nextId(), text: l.content.trim(), level: lvl, note: "" }); }
+      } else { items.push({ id: nextId(), text: l.content.replace(bulletRe, "$1").trim(), level: lvl, note: "" }); }
+    });
+    var norm = [];
+    var prevLevel = -1;
+    items.forEach(function (it) {
+      var lvl = Math.min(it.level, prevLevel + 1);
+      lvl = Math.max(0, lvl);
+      norm.push(Object.assign({}, it, { level: lvl }));
+      prevLevel = lvl;
+    });
+    return norm;
+  }
+
+  function importFromPaste() {
+    var raw = document.getElementById("pasteBox").value;
+    if (!raw.trim()) return;
+    if (state.items.length > 0) {
+      var hasCustom = state.items.some(function (it) { return it.note || it.box || it.highlight || it.callout; });
+      var msg = hasCustom
+        ? "현재 다이어그램의 스타일(박스/메모/설명박스 등)을 포함해 모두 붙여넣은 텍스트로 교체합니다. 계속할까요?"
+        : "현재 다이어그램을 붙여넣은 텍스트로 교체합니다. 계속할까요?";
+      if (!window.confirm(msg)) return;
+    }
+    var parsed = parseOutlineText(raw);
+    if (parsed.length === 0) return;
+    state.items = parsed;
+    state.selectedId = null;
+    state.zoomRootId = null;
+    renderAll();
+  }
+  // ---------------------------------------------------------------------
+  // tree structural helpers (flat items array)
+  // ---------------------------------------------------------------------
+  function indexOfId(id) { for (var i = 0; i < state.items.length; i++) if (state.items[i].id === id) return i; return -1; }
+  function subtreeEnd(idx) { var lvl = state.items[idx].level, i = idx + 1; while (i < state.items.length && state.items[i].level > lvl) i++; return i; }
+  function hasChildren(idx) { return idx + 1 < state.items.length && state.items[idx + 1].level > state.items[idx].level; }
+
+  function indentItem(id) {
+    var idx = indexOfId(id);
+    if (idx <= 0) return;
+    var maxAllowed = state.items[idx - 1].level + 1;
+    if (state.items[idx].level >= maxAllowed) return;
+    var end = subtreeEnd(idx);
+    for (var i = idx; i < end; i++) state.items[i].level += 1;
+    renderAll();
+  }
+  function outdentItem(id) {
+    var idx = indexOfId(id);
+    if (idx < 0 || state.items[idx].level <= 0) return;
+    var end = subtreeEnd(idx);
+    for (var i = idx; i < end; i++) state.items[i].level -= 1;
+    renderAll();
+  }
+  function addSiblingAfter(id, text) {
+    var idx = indexOfId(id);
+    if (idx < 0) return null;
+    var lvl = state.items[idx].level;
+    var insertAt = subtreeEnd(idx);
+    var newItem = { id: nextId(), text: text || "", level: lvl };
+    state.items.splice(insertAt, 0, newItem);
+    return newItem;
+  }
+  function deleteItem(id) {
+    var idx = indexOfId(id);
+    if (idx < 0) return;
+    if (state.items.length === 1) { state.items[0].text = ""; renderAll(); return; }
+    var end = subtreeEnd(idx);
+    state.items.splice(idx, end - idx);
+    if (state.selectedId === id) state.selectedId = null;
+    renderAll();
+  }
+  function moveItem(id, dir) {
+    var idx = indexOfId(id);
+    if (idx < 0) return;
+    var lvl = state.items[idx].level;
+    var end = subtreeEnd(idx);
+    if (dir < 0) {
+      var p = idx - 1;
+      while (p >= 0 && state.items[p].level > lvl) p--;
+      if (p < 0 || state.items[p].level !== lvl) return;
+      var block = state.items.splice(idx, end - idx);
+      state.items.splice.apply(state.items, [p, 0].concat(block));
+    } else {
+      if (end >= state.items.length || state.items[end].level !== lvl) return;
+      var nextEnd = subtreeEnd(end);
+      var block3 = state.items.splice(idx, end - idx);
+      var insertAt = nextEnd - (end - idx);
+      state.items.splice.apply(state.items, [insertAt, 0].concat(block3));
+    }
+    renderAll();
+  }
+
+  // ---------------------------------------------------------------------
+  // display-range helpers (레벨 제한 / 제목 생략 / 개별 접기)
+  // ---------------------------------------------------------------------
+  function getRenderItems() {
+    var base = state.items;
+    if (state.zoomRootId) {
+      var zIdx = indexOfId(state.zoomRootId);
+      if (zIdx >= 0) {
+        var zEnd = subtreeEnd(zIdx);
+        var zBaseLevel = state.items[zIdx].level;
+        base = state.items.slice(zIdx, zEnd).map(function (it) { return Object.assign({}, it, { level: it.level - zBaseLevel }); });
+      }
+    }
+    if (!state.omitRootTitle) return base;
+    return base.filter(function (it) { return it.level > 0; }).map(function (it) { return Object.assign({}, it, { level: it.level - 1 }); });
+  }
+
+  // ---------------------------------------------------------------------
+  // zoom-in navigation (Dynalist-style: focus one item as the top level)
+  // ---------------------------------------------------------------------
+  function zoomAncestorChain(id) {
+    // returns items from the outermost ancestor down to (and including) id
+    var chain = [];
+    var curId = id;
+    while (curId) {
+      var idx = indexOfId(curId);
+      if (idx < 0) break;
+      chain.unshift(state.items[idx]);
+      var lvl = state.items[idx].level;
+      if (lvl === 0) break;
+      var p = idx - 1;
+      while (p >= 0 && state.items[p].level >= lvl) p--;
+      curId = p >= 0 ? state.items[p].id : null;
+    }
+    return chain;
+  }
+  function validateZoomRoot() {
+    if (state.zoomRootId && indexOfId(state.zoomRootId) < 0) state.zoomRootId = null;
+  }
+  function zoomTo(id) {
+    if (id && indexOfId(id) < 0) id = null;
+    state.zoomRootId = id;
+    state.selectedId = null;
+    renderAll();
+  }
+  function renderZoomBar() {
+    var bar = document.getElementById("zoomBar");
+    if (!bar) return;
+    bar.innerHTML = "";
+    if (!state.zoomRootId) { bar.classList.remove("show"); return; }
+    var chain = zoomAncestorChain(state.zoomRootId);
+    if (!chain.length) { bar.classList.remove("show"); return; }
+    var homeBtn = document.createElement("button");
+    homeBtn.className = "zcrumb"; homeBtn.textContent = "전체 문서";
+    homeBtn.addEventListener("click", function () { zoomTo(null); });
+    bar.appendChild(homeBtn);
+    chain.forEach(function (it, i) {
+      var sep = document.createElement("span"); sep.className = "zsep"; sep.textContent = "›";
+      bar.appendChild(sep);
+      var crumb = document.createElement("button");
+      crumb.className = "zcrumb" + (i === chain.length - 1 ? " current" : "");
+      crumb.textContent = it.text && it.text.trim() ? it.text : "(제목 없음)";
+      crumb.title = it.text || "";
+      crumb.addEventListener("click", function () { zoomTo(it.id); });
+      bar.appendChild(crumb);
+    });
+    var outBtn = document.createElement("button");
+    outBtn.className = "tbtn zoomOutBtn";
+    outBtn.innerHTML = ICONS.chevL + "<span>축소</span>";
+    outBtn.addEventListener("click", function () {
+      var parent = chain.length >= 2 ? chain[chain.length - 2].id : null;
+      zoomTo(parent);
+    });
+    bar.appendChild(outBtn);
+    bar.classList.add("show");
+  }
+  function defaultChildrenVisible(node) {
+    if (state.maxDisplayLevel == null) return true;
+    return (node.level + 1) <= (state.maxDisplayLevel - 1);
+  }
+  function effectiveChildrenVisible(node) {
+    if (node.levelOverride === "hide") return false;
+    if (node.levelOverride === "show") return true;
+    return defaultChildrenVisible(node);
+  }
+  function toggleNodeVisibility(id) {
+    var it = getItemById(id);
+    if (!it) return;
+    if (it.levelOverride) { it.levelOverride = null; }
+    else {
+      var lvl = it.level - (state.omitRootTitle ? 1 : 0);
+      var natural = state.maxDisplayLevel == null ? true : (lvl + 1) <= (state.maxDisplayLevel - 1);
+      it.levelOverride = natural ? "hide" : "show";
+    }
+    scheduleDiagramRender();
+  }
+
+  // ---------------------------------------------------------------------
+  // simplified structure list rendering
+  // ---------------------------------------------------------------------
+  var listBody = document.getElementById("listBody");
+  var pendingFocusId = null;
+  var draggingId = null; // Dynalist-style row reordering (drag handle → drop before/after a row)
+
+  function renderList() {
+    validateZoomRoot();
+    renderZoomBar();
+    listBody.innerHTML = "";
+    var items = state.items, baseLevel = 0;
+    if (state.zoomRootId) {
+      var zIdx = indexOfId(state.zoomRootId);
+      if (zIdx >= 0) {
+        baseLevel = state.items[zIdx].level;
+        items = state.items.slice(zIdx, subtreeEnd(zIdx));
+      }
+    }
+    var hideBelowLevel = null; // editor-only fold: while set, skip rows deeper than this level
+    items.forEach(function (it) {
+      var lvl = it.level - baseLevel;
+      if (hideBelowLevel !== null) {
+        if (lvl > hideBelowLevel) return;
+        hideBelowLevel = null;
+      }
+      listBody.appendChild(buildListRow(it, lvl));
+      var idx = indexOfId(it.id);
+      if (it.editorFold && idx >= 0 && hasChildren(idx)) hideBelowLevel = lvl;
+    });
+    if (pendingFocusId) {
+      var el = listBody.querySelector('input[data-id="' + cssEscape(pendingFocusId) + '"]');
+      if (el) { el.focus(); var L = el.value.length; el.setSelectionRange(L, L); }
+      pendingFocusId = null;
+    }
+  }
+  function cssEscape(s) { return s.replace(/[^a-zA-Z0-9_-]/g, "\\$&"); }
+  function clearDragOverStyles() { listBody.querySelectorAll(".lrow").forEach(function (r) { r.classList.remove("dragOver-before", "dragOver-after"); }); }
+
+  // Move a whole subtree (source) to sit right before/after a target row, matching the
+  // target's level so it becomes a sibling — the Dynalist "drag to reorder/reparent" pattern.
+  function moveItemViaDrag(sourceId, targetId, before) {
+    if (sourceId === targetId) return;
+    var srcIdx = indexOfId(sourceId);
+    if (srcIdx < 0) return;
+    var srcEnd = subtreeEnd(srcIdx);
+    var tgtIdx = indexOfId(targetId);
+    if (tgtIdx < 0 || (tgtIdx >= srcIdx && tgtIdx < srcEnd)) return; // can't drop onto itself/its own descendant
+    var srcLevel = state.items[srcIdx].level;
+    var block = state.items.splice(srcIdx, srcEnd - srcIdx);
+    var newTgtIdx = indexOfId(targetId);
+    if (newTgtIdx < 0) { state.items.splice.apply(state.items, [srcIdx, 0].concat(block)); return; }
+    var targetLevel = state.items[newTgtIdx].level;
+    var insertAt = before ? newTgtIdx : subtreeEnd(newTgtIdx);
+    var levelShift = targetLevel - srcLevel;
+    if (levelShift !== 0) block.forEach(function (b) { b.level = Math.max(0, b.level + levelShift); });
+    state.items.splice.apply(state.items, [insertAt, 0].concat(block));
+    renderAll();
+  }
+
+  function buildListRow(it, displayLevel) {
+    var row = document.createElement("div");
+    row.className = "lrow" + (state.focusedId === it.id ? " focused" : "");
+    row.setAttribute("data-id", it.id);
+
+    var handle = document.createElement("span");
+    handle.className = "dragHandleSm"; handle.innerHTML = ICONS.grip; handle.title = "드래그해서 위치 이동";
+    handle.draggable = true;
+    handle.addEventListener("dragstart", function (e) {
+      draggingId = it.id; row.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", it.id);
+    });
+    handle.addEventListener("dragend", function () { row.classList.remove("dragging"); clearDragOverStyles(); draggingId = null; });
+    row.appendChild(handle);
+
+    row.addEventListener("dragover", function (e) {
+      if (!draggingId || draggingId === it.id) return;
+      e.preventDefault();
+      var rect = row.getBoundingClientRect();
+      var before = (e.clientY - rect.top) < rect.height / 2;
+      row.classList.toggle("dragOver-before", before);
+      row.classList.toggle("dragOver-after", !before);
+    });
+    row.addEventListener("dragleave", function () { row.classList.remove("dragOver-before", "dragOver-after"); });
+    row.addEventListener("drop", function (e) {
+      e.preventDefault();
+      var before = row.classList.contains("dragOver-before");
+      row.classList.remove("dragOver-before", "dragOver-after");
+      var srcId = draggingId; draggingId = null;
+      if (!srcId || srcId === it.id) return;
+      moveItemViaDrag(srcId, it.id, before);
+    });
+
+    var guides = document.createElement("span");
+    guides.className = "lguides";
+    for (var g = 0; g < displayLevel; g++) { var gd = document.createElement("span"); gd.className = "lguide"; guides.appendChild(gd); }
+    row.appendChild(guides);
+
+    var idxForFold = indexOfId(it.id);
+    if (idxForFold >= 0 && hasChildren(idxForFold)) {
+      var foldBtn = document.createElement("button");
+      foldBtn.type = "button"; foldBtn.className = "foldBtn";
+      foldBtn.textContent = it.editorFold ? "▸" : "▾";
+      foldBtn.title = it.editorFold ? "하위 항목 펼치기" : "하위 항목 접기";
+      foldBtn.addEventListener("mousedown", function (e) { e.preventDefault(); it.editorFold = !it.editorFold; renderList(); });
+      row.appendChild(foldBtn);
+    } else {
+      var foldSpacer = document.createElement("span"); foldSpacer.className = "foldSpacer"; row.appendChild(foldSpacer);
+    }
+
+    if (state.multiSelectMode) {
+      var selChk = document.createElement("input");
+      selChk.type = "checkbox"; selChk.className = "selChk"; selChk.style.accentColor = "var(--ink)"; selChk.style.flexShrink = "0";
+      selChk.checked = state.selectedIds.has(it.id);
+      selChk.addEventListener("change", function () { toggleMultiSelect(it.id); });
+      row.appendChild(selChk);
+    }
+    var lvl = document.createElement("span");
+    lvl.className = "lvl"; lvl.textContent = displayLevel + 1;
+    row.appendChild(lvl);
+    if (it.box || it.highlight || it.note || it.callout || it.checkbox || it.badge || it.md) {
+      var badge = document.createElement("span");
+      badge.className = "badge";
+      badge.style.background = (it.badge && it.badge.color) || it.highlight || (it.box ? (it.boxColor || "#111") : "var(--gray-300)");
+      badge.title = "스타일 적용됨";
+      row.appendChild(badge);
+    }
+    var input = document.createElement("input");
+    input.type = "text"; input.className = "ltext"; input.value = it.text; input.setAttribute("data-id", it.id);
+    input.addEventListener("input", function () { it.text = input.value; scheduleDiagramRender(); });
+    input.addEventListener("focus", function () { state.focusedId = it.id; row.classList.add("focused"); renderMobileBarVisibility(); });
+    input.addEventListener("blur", function () { row.classList.remove("focused"); });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        var created = addSiblingAfter(it.id, "");
+        pendingFocusId = created.id; renderList(); scheduleDiagramRender();
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        if (e.shiftKey) outdentItem(it.id); else indentItem(it.id);
+        pendingFocusId = it.id;
+      }
+    });
+    row.appendChild(input);
+    var btns = document.createElement("span");
+    btns.className = "lbtns";
+    var mdBtn = makeIcBtn(ICONS.note, it.md ? "MD 노트 보기/편집" : "MD 노트 추가", function () { openMdPopup(it.id); });
+    if (it.md) mdBtn.classList.add("mdActive");
+    btns.appendChild(mdBtn);
+    btns.appendChild(makeIcBtn(ICONS.zoomin, "이 항목으로 확대(줌인)", function () { zoomTo(it.id); }));
+    btns.appendChild(makeIcBtn(ICONS.outdent, "내어쓰기", function () { outdentItem(it.id); }));
+    btns.appendChild(makeIcBtn(ICONS.indent, "들여쓰기", function () { indentItem(it.id); }));
+    btns.appendChild(makeIcBtn(ICONS.trash, "삭제", function () { deleteItem(it.id); }, true));
+    row.appendChild(btns);
+    return row;
+  }
+  function makeIcBtn(html, title, fn, danger) {
+    var b = document.createElement("button");
+    b.className = "icbtn" + (danger ? " danger" : "");
+    b.innerHTML = html; b.title = title;
+    b.addEventListener("mousedown", function (e) { e.preventDefault(); fn(); });
+    return b;
+  }
+
+  // ---------------------------------------------------------------------
+  // text measuring
+  // ---------------------------------------------------------------------
+  var measureCanvas = document.createElement("canvas");
+  var measureCtx = measureCanvas.getContext("2d");
+  function measureText(text, px, weight, fontCss) {
+    measureCtx.font = weight + " " + px + "px " + fontCss;
+    return measureCtx.measureText(text && text.length ? text : " ").width;
+  }
+  function luminanceOf(hex) {
+    if (!hex) return 1;
+    var h = hex.replace("#", "");
+    if (h.length === 3) h = h.split("").map(function (c) { return c + c; }).join("");
+    var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  }
+
+  // ---------------------------------------------------------------------
+  // diagram layout
+  // ---------------------------------------------------------------------
+  var BOX_PAD_X = 12, BOX_PAD_Y = 7, NOTE_GAP = 4, CALLOUT_PAD_X = 9, CALLOUT_PAD_Y = 7, NOTE_SIDE_GAP = 10;
+
+  function noteStyleFor(it) {
+    var s = it.noteStyle || {};
+    return {
+      color: s.color || null,
+      italic: typeof s.italic === "boolean" ? s.italic : true,
+      size: s.size || null,
+      position: s.position || "bottom",
+      border: !!s.border,
+      borderColor: s.borderColor || "#111111",
+    };
+  }
+  function calloutStyleFor(it) {
+    var c = it.callout || {};
+    return {
+      text: c.text || "", dx: typeof c.dx === "number" ? c.dx : 60, dy: typeof c.dy === "number" ? c.dy : -46,
+      color: c.color || "#111111", italic: !!c.italic, size: c.size || null,
+      borderColor: c.borderColor || "#111111", borderWidth: typeof c.borderWidth === "number" ? c.borderWidth : 1.4,
+      lineColor: c.lineColor || "#111111", lineWidth: typeof c.lineWidth === "number" ? c.lineWidth : null, dashed: typeof c.dashed === "boolean" ? c.dashed : true,
+    };
+  }
+  // greedy word-wrap; falls back to character-level splitting for runs
+  // with no spaces (e.g. long unbroken Korean text)
+  function wrapText(text, maxWidth, fontSize, weight, fontCss) {
+    var raw = text && text.length ? text : " ";
+    if (!maxWidth || measureText(raw, fontSize, weight, fontCss) <= maxWidth) return [raw];
+    var words = raw.split(/(\s+)/);
+    var lines = [], current = "";
+    words.forEach(function (w) {
+      var test = current + w;
+      if (current.trim() !== "" && measureText(test, fontSize, weight, fontCss) > maxWidth) {
+        lines.push(current.replace(/\s+$/, "")); current = w.replace(/^\s+/, "");
+      } else { current = test; }
+    });
+    if (current.trim() !== "" || lines.length === 0) lines.push(current.replace(/\s+$/, ""));
+    var finalLines = [];
+    lines.forEach(function (line) {
+      if (measureText(line, fontSize, weight, fontCss) <= maxWidth || line.length <= 1) { finalLines.push(line); return; }
+      var chars = Array.from(line), cur = "";
+      chars.forEach(function (ch) {
+        var t = cur + ch;
+        if (cur !== "" && measureText(t, fontSize, weight, fontCss) > maxWidth) { finalLines.push(cur); cur = ch; }
+        else cur = t;
+      });
+      if (cur) finalLines.push(cur);
+    });
+    return finalLines.length ? finalLines : [raw];
+  }
+
+  function computeLayout() {
+    var items = getRenderItems();
+    if (!items.length) return { nodes: [], connectors: [], callouts: [], width: 0, height: 0, font: currentFont(), mode: state.diagramMode };
+    return state.diagramMode === "vertical" ? computeLayoutVertical(items) : computeLayoutTree(items);
+  }
+
+  function sizeFor(it) { return it.fontSize || getLevelSetting(it.level).size || DEFAULT_LEVEL_SIZE; }
+  function boldFor(it) { return typeof it.bold === "boolean" ? it.bold : getLevelSetting(it.level).bold; }
+
+  // shared per-item measurement (text wrapping, note/checkbox sizing) used by both layout modes
+  function measureItemsBase(items, font, maxTextW) {
+    return items.map(function (it) {
+      var fs = sizeFor(it), bold = boldFor(it), weight = bold ? font.weight700 : font.weight400;
+      var mainLines = wrapText(it.text, maxTextW, fs, weight, font.css);
+      var lineHeight = fs * 1.25;
+      var textW = 0; mainLines.forEach(function (l) { textW = Math.max(textW, measureText(l, fs, weight, font.css)); });
+      var textBlockH = mainLines.length * lineHeight;
+
+      var nStyle = noteStyleFor(it);
+      var noteFs = it.note ? (nStyle.size || Math.max(10, Math.round(fs * 0.55))) : 0;
+      var noteLines = it.note ? it.note.split("\n") : [];
+      var noteLineHeight = noteFs * 1.25;
+      var noteW = 0; noteLines.forEach(function (nl) { noteW = Math.max(noteW, measureText(nl, noteFs, nStyle.italic ? weight : 400, font.css)); });
+      var noteVertical = !!(it.note && (nStyle.position === "top" || nStyle.position === "bottom"));
+      var noteHorizontal = !!(it.note && (nStyle.position === "left" || nStyle.position === "right"));
+      var noteBlockH = it.note ? (noteLines.length * noteLineHeight + NOTE_GAP) : 0;
+
+      var checkboxW = it.checkbox ? Math.round(fs * 0.78) + 8 : 0;
+      var contentW = noteHorizontal ? textW : Math.max(textW, noteW);
+      var effWidth = (it.box ? contentW + BOX_PAD_X * 2 : contentW) + checkboxW;
+      var blockH = textBlockH + (noteVertical ? noteBlockH : 0);
+      var rowH = it.box ? blockH + BOX_PAD_Y * 2 : blockH;
+      return Object.assign({}, it, {
+        fontSize: fs, bold: bold, mainLines: mainLines, lineHeight: lineHeight, textWidth: textW, textBlockH: textBlockH,
+        noteStyle: nStyle, noteFontSize: noteFs, noteLines: noteLines, noteLineHeight: noteLineHeight,
+        noteVertical: noteVertical, noteHorizontal: noteHorizontal, noteBlockH: noteBlockH,
+        checkboxW: checkboxW, effWidth: effWidth, blockH: blockH, rowH: rowH,
+      });
+    });
+  }
+
+  // finalize text/note pixel positions once a node's centerY (vertical center) is known;
+  // shared by both the horizontal-tree and vertical-indent layouts
+  function finalizeNodeGeometry(node, font) {
+    var blockTop = node.centerY - node.blockH / 2;
+    if (node.noteVertical && node.noteStyle.position === "top") {
+      node.noteBlockTop = blockTop;
+      node.textBlockTop = blockTop + node.noteBlockH;
+    } else {
+      node.textBlockTop = blockTop;
+      node.noteBlockTop = blockTop + node.textBlockH;
+    }
+    node.textLineYs = node.mainLines.map(function (_, i) { return node.textBlockTop + i * node.lineHeight + node.fontSize * 0.82; });
+    node.textY = node.textLineYs[0];
+
+    var boxInnerX = node.box ? node.x + BOX_PAD_X : node.x;
+    var contentX = boxInnerX + node.checkboxW;
+    node.contentX = contentX;
+    if (node.note) {
+      if (node.noteVertical) {
+        node.noteX = contentX;
+        node.noteLineYs = node.noteLines.map(function (_, i) { return node.noteBlockTop + i * node.noteLineHeight + node.noteFontSize * 0.85; });
+      } else if (node.noteHorizontal) {
+        var noteMaxW = 0; node.noteLines.forEach(function (l) { noteMaxW = Math.max(noteMaxW, measureText(l, node.noteFontSize, node.noteStyle.italic ? node.font700 : 400, font.css)); });
+        node.noteMaxW = noteMaxW;
+        node.noteX = node.noteStyle.position === "right" ? (contentX + node.textWidth + NOTE_SIDE_GAP) : (contentX - NOTE_SIDE_GAP - noteMaxW);
+        var totalNoteH = node.noteLines.length * node.noteLineHeight;
+        var startTop = node.centerY - totalNoteH / 2;
+        node.noteLineYs = node.noteLines.map(function (_, i) { return startTop + i * node.noteLineHeight + node.noteFontSize * 0.85; });
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // layout mode 1: horizontal tree — columns fan out to the right per level
+  // ---------------------------------------------------------------------
+  function computeLayoutTree(items) {
+    var marginX = 34, marginY = 30, hGap = 64, leafGap = 20;
+    var font = currentFont();
+    var maxTextW = state.canvasMaxTextWidth || null;
+
+    var mLevel = 0;
+    for (var i = 0; i < items.length; i++) mLevel = Math.max(mLevel, items[i].level);
+    var colWidth = new Array(mLevel + 1).fill(0);
+
+    var measured = measureItemsBase(items, font, maxTextW);
+    measured.forEach(function (it) { colWidth[it.level] = Math.max(colWidth[it.level], it.effWidth); });
+
+    var colX = new Array(mLevel + 1).fill(0);
+    colX[0] = marginX;
+    for (var l = 1; l <= mLevel; l++) colX[l] = colX[l - 1] + colWidth[l - 1] + hGap;
+
+    var nodes = measured.map(function (it) { return Object.assign({}, it, { x: colX[it.level], children: [] }); });
+
+    var stack = [], roots = [];
+    nodes.forEach(function (node) {
+      while (stack.length && stack[stack.length - 1].level >= node.level) stack.pop();
+      if (stack.length === 0) roots.push(node); else stack[stack.length - 1].children.push(node);
+      stack.push(node);
+    });
+
+    nodes.forEach(function (node) {
+      node.hasRealChildren = node.children.length > 0;
+      node.childrenVisible = node.hasRealChildren && effectiveChildrenVisible(node);
+    });
+
+    var cursorY = marginY;
+    function assignY(node) {
+      if (!node.childrenVisible) {
+        node.centerY = cursorY + node.rowH / 2;
+        cursorY += node.rowH + leafGap;
+      } else {
+        node.children.forEach(assignY);
+        node.centerY = node.children[0].centerY;
+      }
+      finalizeNodeGeometry(node, font);
+    }
+    roots.forEach(assignY);
+
+    var connectors = [];
+    function collect(node) {
+      if (node.childrenVisible) {
+        var bendX = node.x + node.effWidth + hGap / 2;
+        var ys = node.children.map(function (c) { return c.centerY; }).concat([node.centerY]);
+        var vTop = Math.min.apply(null, ys), vBottom = Math.max.apply(null, ys);
+        connectors.push({ kind: "h", x1: node.x + node.effWidth + 6, x2: bendX, y: node.centerY });
+        connectors.push({ kind: "v", x: bendX, y1: vTop, y2: vBottom });
+        node.children.forEach(function (c) { connectors.push({ kind: "h", x1: bendX, x2: c.x - 6, y: c.centerY }); });
+        node.children.forEach(collect);
+      }
+    }
+    roots.forEach(collect);
+
+    var callouts = [];
+    nodes.forEach(function (node) {
+      if (!node.callout || !node.callout.text) return;
+      var cs = calloutStyleFor(node.callout);
+      var cfs = cs.size || Math.max(11, Math.round(node.fontSize * 0.5));
+      var weight = cs.italic ? 400 : 400;
+      var lines = cs.text.split("\n");
+      var lineH = cfs * 1.4;
+      var cw = 0; lines.forEach(function (ln) { cw = Math.max(cw, measureText(ln, cfs, 400, font.css)); });
+      var boxW = cw + CALLOUT_PAD_X * 2;
+      var boxH = lines.length * lineH + CALLOUT_PAD_Y * 2;
+      var anchorX = node.x + node.effWidth, anchorY = node.centerY;
+      var boxX = anchorX + cs.dx, boxY = anchorY + cs.dy - boxH / 2;
+      var leaderTarget = cs.dx >= 0 ? { x: boxX, y: boxY + boxH / 2 } : { x: boxX + boxW, y: boxY + boxH / 2 };
+      callouts.push({ nodeId: node.id, x: boxX, y: boxY, w: boxW, h: boxH, lines: lines, fontSize: cfs, lineH: lineH, style: cs, from: { x: anchorX, y: anchorY }, to: leaderTarget });
+    });
+
+    var minX = marginX, minY = marginY, maxX = 0, maxY = 0;
+    nodes.forEach(function (n) {
+      var top = n.centerY - n.blockH / 2 - (n.box ? BOX_PAD_Y : 0);
+      var bot = n.centerY + n.blockH / 2 + (n.box ? BOX_PAD_Y : 0);
+      minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x + n.effWidth);
+      minY = Math.min(minY, top); maxY = Math.max(maxY, bot);
+      if (n.noteHorizontal) {
+        minX = Math.min(minX, n.noteX); maxX = Math.max(maxX, n.noteX + n.noteMaxW);
+        var nTop = Math.min.apply(null, n.noteLineYs) - n.noteFontSize;
+        var nBot = Math.max.apply(null, n.noteLineYs) + n.noteFontSize * 0.35;
+        minY = Math.min(minY, nTop); maxY = Math.max(maxY, nBot);
+      }
+    });
+    callouts.forEach(function (c) {
+      minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x + c.w);
+      minY = Math.min(minY, c.y); maxY = Math.max(maxY, c.y + c.h);
+    });
+    var shiftX = marginX - minX, shiftY = marginY - minY;
+    if (shiftX || shiftY) {
+      nodes.forEach(function (n) {
+        n.x += shiftX; n.centerY += shiftY; n.textY += shiftY; n.contentX += shiftX;
+        n.textLineYs = n.textLineYs.map(function (y) { return y + shiftY; });
+        if (n.noteLineYs) n.noteLineYs = n.noteLineYs.map(function (y) { return y + shiftY; });
+        if (typeof n.noteX === "number") n.noteX += shiftX;
+      });
+      connectors.forEach(function (c) {
+        if (c.kind === "v") { c.x += shiftX; c.y1 += shiftY; c.y2 += shiftY; }
+        else { c.x1 += shiftX; c.x2 += shiftX; c.y += shiftY; }
+      });
+      callouts.forEach(function (c) { c.x += shiftX; c.y += shiftY; c.from.x += shiftX; c.from.y += shiftY; c.to.x += shiftX; c.to.y += shiftY; });
+      maxX += shiftX; maxY += shiftY;
+    }
+
+    return { nodes: nodes, connectors: connectors, callouts: callouts, width: maxX + marginX, height: maxY + marginY, font: font, mode: "tree" };
+  }
+
+  // ---------------------------------------------------------------------
+  // layout mode 2: vertical indent — each visible node stacks top-to-bottom,
+  // indented a fixed step per level, like a classic outline/file-tree view
+  // ---------------------------------------------------------------------
+  function computeLayoutVertical(items) {
+    var marginX = 34, marginY = 30, indentStep = 26, rowGap = 10;
+    var font = currentFont();
+    var maxTextW = state.canvasMaxTextWidth || null;
+
+    var measured = measureItemsBase(items, font, maxTextW);
+    var nodes = measured.map(function (it) { return Object.assign({}, it, { x: marginX + it.level * indentStep, children: [] }); });
+
+    var stack = [], roots = [];
+    nodes.forEach(function (node) {
+      while (stack.length && stack[stack.length - 1].level >= node.level) stack.pop();
+      if (stack.length === 0) roots.push(node); else stack[stack.length - 1].children.push(node);
+      stack.push(node);
+    });
+    nodes.forEach(function (node) {
+      node.hasRealChildren = node.children.length > 0;
+      node.childrenVisible = node.hasRealChildren && effectiveChildrenVisible(node);
+    });
+
+    var cursorY = marginY;
+    function layoutV(node) {
+      node.centerY = cursorY + node.rowH / 2;
+      cursorY += node.rowH + rowGap;
+      finalizeNodeGeometry(node, font);
+      if (node.childrenVisible) node.children.forEach(layoutV);
+    }
+    roots.forEach(layoutV);
+
+    var connectors = [];
+    function collect(node) {
+      if (!node.childrenVisible) return;
+      var guideX = node.x + 8;
+      var childYs = node.children.map(function (c) { return c.centerY; });
+      var vTop = node.centerY + node.rowH / 2 + (node.box ? BOX_PAD_Y : 0) + 2;
+      var vBottom = Math.max.apply(null, childYs);
+      connectors.push({ kind: "v", x: guideX, y1: Math.min(vTop, vBottom), y2: Math.max(vTop, vBottom) });
+      node.children.forEach(function (c) { connectors.push({ kind: "h", x1: guideX, x2: Math.max(guideX, c.x - 6), y: c.centerY }); });
+      node.children.forEach(collect);
+    }
+    roots.forEach(collect);
+
+    var callouts = [];
+    nodes.forEach(function (node) {
+      if (!node.callout || !node.callout.text) return;
+      var cs = calloutStyleFor(node.callout);
+      var cfs = cs.size || Math.max(11, Math.round(node.fontSize * 0.5));
+      var lines = cs.text.split("\n");
+      var lineH = cfs * 1.4;
+      var cw = 0; lines.forEach(function (ln) { cw = Math.max(cw, measureText(ln, cfs, 400, font.css)); });
+      var boxW = cw + CALLOUT_PAD_X * 2;
+      var boxH = lines.length * lineH + CALLOUT_PAD_Y * 2;
+      var anchorX = node.x + node.effWidth, anchorY = node.centerY;
+      var boxX = anchorX + cs.dx, boxY = anchorY + cs.dy - boxH / 2;
+      var leaderTarget = cs.dx >= 0 ? { x: boxX, y: boxY + boxH / 2 } : { x: boxX + boxW, y: boxY + boxH / 2 };
+      callouts.push({ nodeId: node.id, x: boxX, y: boxY, w: boxW, h: boxH, lines: lines, fontSize: cfs, lineH: lineH, style: cs, from: { x: anchorX, y: anchorY }, to: leaderTarget });
+    });
+
+    var minX = marginX, minY = marginY, maxX = 0, maxY = 0;
+    nodes.forEach(function (n) {
+      var top = n.centerY - n.blockH / 2 - (n.box ? BOX_PAD_Y : 0);
+      var bot = n.centerY + n.blockH / 2 + (n.box ? BOX_PAD_Y : 0);
+      minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x + n.effWidth);
+      minY = Math.min(minY, top); maxY = Math.max(maxY, bot);
+      if (n.noteHorizontal) {
+        minX = Math.min(minX, n.noteX); maxX = Math.max(maxX, n.noteX + n.noteMaxW);
+        var nTop = Math.min.apply(null, n.noteLineYs) - n.noteFontSize;
+        var nBot = Math.max.apply(null, n.noteLineYs) + n.noteFontSize * 0.35;
+        minY = Math.min(minY, nTop); maxY = Math.max(maxY, nBot);
+      }
+    });
+    callouts.forEach(function (c) {
+      minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x + c.w);
+      minY = Math.min(minY, c.y); maxY = Math.max(maxY, c.y + c.h);
+    });
+    var shiftX = marginX - minX, shiftY = marginY - minY;
+    if (shiftX || shiftY) {
+      nodes.forEach(function (n) {
+        n.x += shiftX; n.centerY += shiftY; n.textY += shiftY; n.contentX += shiftX;
+        n.textLineYs = n.textLineYs.map(function (y) { return y + shiftY; });
+        if (n.noteLineYs) n.noteLineYs = n.noteLineYs.map(function (y) { return y + shiftY; });
+        if (typeof n.noteX === "number") n.noteX += shiftX;
+      });
+      connectors.forEach(function (c) {
+        if (c.kind === "v") { c.x += shiftX; c.y1 += shiftY; c.y2 += shiftY; }
+        else { c.x1 += shiftX; c.x2 += shiftX; c.y += shiftY; }
+      });
+      callouts.forEach(function (c) { c.x += shiftX; c.y += shiftY; c.from.x += shiftX; c.from.y += shiftY; c.to.x += shiftX; c.to.y += shiftY; });
+      maxX += shiftX; maxY += shiftY;
+    }
+
+    return { nodes: nodes, connectors: connectors, callouts: callouts, width: maxX + marginX, height: maxY + marginY, font: font, mode: "vertical" };
+  }
+
+  // ---------------------------------------------------------------------
+  // drawing (shared by the live editor svg AND read-only thumbnails)
+  // ---------------------------------------------------------------------
+  var SVGNS = "http://www.w3.org/2000/svg";
+
+  function drawBadgeShape(svgEl, shape, cx, cy, r, color) {
+    var el;
+    if (shape === "circle") { el = document.createElementNS(SVGNS, "circle"); el.setAttribute("cx", cx); el.setAttribute("cy", cy); el.setAttribute("r", r); }
+    else if (shape === "square") { el = document.createElementNS(SVGNS, "rect"); el.setAttribute("x", cx - r); el.setAttribute("y", cy - r); el.setAttribute("width", r * 2); el.setAttribute("height", r * 2); el.setAttribute("rx", 2); }
+    else if (shape === "diamond") { el = document.createElementNS(SVGNS, "polygon"); el.setAttribute("points", [cx, cy - r, cx + r, cy, cx, cy + r, cx - r, cy].join(",")); }
+    else { el = document.createElementNS(SVGNS, "polygon"); el.setAttribute("points", [cx, cy - r, cx + r * 0.95, cy + r * 0.8, cx - r * 0.95, cy + r * 0.8].join(",")); }
+    el.setAttribute("fill", color); el.setAttribute("stroke", "#FFFFFF"); el.setAttribute("stroke-width", 1.4);
+    svgEl.appendChild(el);
+  }
+
+  function drawLayoutToSvg(svgEl, layout, interactive) {
+    var w = Math.max(layout.width, 320), h = Math.max(layout.height, 160);
+    svgEl.setAttribute("width", w); svgEl.setAttribute("height", h); svgEl.setAttribute("viewBox", "0 0 " + w + " " + h);
+    svgEl.innerHTML = "";
+    var bg = document.createElementNS(SVGNS, "rect");
+    bg.setAttribute("width", w); bg.setAttribute("height", h); bg.setAttribute("fill", "#FFFFFF");
+    if (interactive) bg.addEventListener("click", function () { selectNode(null); });
+    svgEl.appendChild(bg);
+
+    layout.connectors.forEach(function (c) {
+      var line = document.createElementNS(SVGNS, "line");
+      if (c.kind === "v") { line.setAttribute("x1", c.x); line.setAttribute("x2", c.x); line.setAttribute("y1", c.y1); line.setAttribute("y2", c.y2); }
+      else { line.setAttribute("x1", c.x1); line.setAttribute("x2", c.x2); line.setAttribute("y1", c.y); line.setAttribute("y2", c.y); }
+      line.setAttribute("stroke", "#111111"); line.setAttribute("stroke-width", state.lineWidth); line.setAttribute("stroke-linecap", "square");
+      svgEl.appendChild(line);
+    });
+
+    layout.callouts.forEach(function (c) {
+      var cs = c.style;
+      var leader = document.createElementNS(SVGNS, "line");
+      leader.setAttribute("x1", c.from.x); leader.setAttribute("y1", c.from.y); leader.setAttribute("x2", c.to.x); leader.setAttribute("y2", c.to.y);
+      leader.setAttribute("stroke", cs.lineColor); leader.setAttribute("stroke-width", cs.lineWidth == null ? Math.max(1, state.lineWidth * 0.5) : cs.lineWidth);
+      if (cs.dashed) leader.setAttribute("stroke-dasharray", "4 3");
+      svgEl.appendChild(leader);
+      var rect = document.createElementNS(SVGNS, "rect");
+      rect.setAttribute("x", c.x); rect.setAttribute("y", c.y); rect.setAttribute("width", c.w); rect.setAttribute("height", c.h);
+      rect.setAttribute("rx", 7); rect.setAttribute("fill", "#FFFFFF"); rect.setAttribute("stroke", cs.borderColor); rect.setAttribute("stroke-width", cs.borderWidth);
+      svgEl.appendChild(rect);
+      c.lines.forEach(function (ln, i) {
+        var t = document.createElementNS(SVGNS, "text");
+        t.setAttribute("x", c.x + CALLOUT_PAD_X); t.setAttribute("y", c.y + CALLOUT_PAD_Y + c.fontSize * 0.85 + i * c.lineH);
+        t.setAttribute("font-size", c.fontSize); t.setAttribute("fill", cs.color);
+        if (cs.italic) t.setAttribute("font-style", "italic");
+        t.setAttribute("font-family", layout.font.css.replace(/"/g, "'"));
+        t.textContent = ln;
+        svgEl.appendChild(t);
+      });
+    });
+
+    layout.nodes.forEach(function (n) {
+      var g = document.createElementNS(SVGNS, "g");
+      g.setAttribute("data-node-id", n.id);
+      if (interactive) g.style.cursor = "pointer";
+
+      var topY = n.centerY - n.blockH / 2 - (n.box ? BOX_PAD_Y : 0);
+      var boxH = n.rowH;
+
+      if (n.box) {
+        var rect = document.createElementNS(SVGNS, "rect");
+        rect.setAttribute("x", n.x); rect.setAttribute("y", topY); rect.setAttribute("width", n.effWidth); rect.setAttribute("height", boxH);
+        rect.setAttribute("rx", 8); rect.setAttribute("fill", n.boxColor || "#FFFFFF");
+        rect.setAttribute("stroke", "#111111"); rect.setAttribute("stroke-width", Math.max(1.4, state.lineWidth * 0.6));
+        g.appendChild(rect);
+      }
+
+      var textColor = "#111111";
+      if (n.box) textColor = luminanceOf(n.boxColor || "#FFFFFF") < 0.5 ? "#FFFFFF" : "#111111";
+      var contentX = n.contentX;
+      var checkboxX = n.box ? n.x + BOX_PAD_X : n.x;
+
+      if (n.checkbox) {
+        var cbSize = Math.round(n.fontSize * 0.78);
+        var cbY = n.textY - n.fontSize * 0.78;
+        var cbRect = document.createElementNS(SVGNS, "rect");
+        cbRect.setAttribute("x", checkboxX); cbRect.setAttribute("y", cbY); cbRect.setAttribute("width", cbSize); cbRect.setAttribute("height", cbSize);
+        cbRect.setAttribute("rx", 3); cbRect.setAttribute("fill", n.checked ? "#111111" : "#FFFFFF");
+        cbRect.setAttribute("stroke", textColor === "#FFFFFF" ? "#FFFFFF" : "#111111"); cbRect.setAttribute("stroke-width", 1.6);
+        if (interactive) { cbRect.style.cursor = "pointer"; cbRect.addEventListener("click", function (e) { e.stopPropagation(); n.checked = !n.checked; var src = getItemById(n.id); if (src) src.checked = n.checked; scheduleDiagramRender(); }); }
+        g.appendChild(cbRect);
+        if (n.checked) {
+          var ck = document.createElementNS(SVGNS, "polyline");
+          ck.setAttribute("points", (checkboxX + cbSize * 0.2) + "," + (cbY + cbSize * 0.55) + " " + (checkboxX + cbSize * 0.42) + "," + (cbY + cbSize * 0.78) + " " + (checkboxX + cbSize * 0.82) + "," + (cbY + cbSize * 0.22));
+          ck.setAttribute("fill", "none"); ck.setAttribute("stroke", "#FFFFFF"); ck.setAttribute("stroke-width", 1.8);
+          ck.setAttribute("stroke-linecap", "round"); ck.setAttribute("stroke-linejoin", "round");
+          if (interactive) ck.style.pointerEvents = "none";
+          g.appendChild(ck);
+        }
+      }
+
+      if (n.highlight) {
+        var hl = document.createElementNS(SVGNS, "rect");
+        hl.setAttribute("x", contentX - 3); hl.setAttribute("y", n.textBlockTop - 1);
+        hl.setAttribute("width", n.textWidth + 6); hl.setAttribute("height", n.textBlockH + 2);
+        hl.setAttribute("rx", 2); hl.setAttribute("fill", n.highlight); hl.setAttribute("opacity", "0.55");
+        g.appendChild(hl);
+      }
+
+      n.mainLines.forEach(function (line, i) {
+        var t = document.createElementNS(SVGNS, "text");
+        t.setAttribute("x", contentX); t.setAttribute("y", n.textLineYs[i]);
+        t.setAttribute("font-size", n.fontSize); t.setAttribute("font-weight", n.bold ? "700" : "400");
+        t.setAttribute("fill", textColor); t.setAttribute("font-family", layout.font.css.replace(/"/g, "'"));
+        if (n.underline) t.setAttribute("text-decoration", "underline");
+        t.textContent = line;
+        g.appendChild(t);
+      });
+
+      if (n.note) {
+        var ns = n.noteStyle;
+        var noteColor = ns.color || (n.box && luminanceOf(n.boxColor || "#FFFFFF") < 0.5 ? "#E5E5E5" : "#767268");
+        if (ns.border) {
+          var nb = document.createElementNS(SVGNS, "rect");
+          var nbTop = Math.min.apply(null, n.noteLineYs) - n.noteFontSize * 0.95;
+          var nbH = (Math.max.apply(null, n.noteLineYs) + n.noteFontSize * 0.3) - nbTop;
+          var nbW = n.noteHorizontal ? n.noteMaxW : (function () { var mw = 0; n.noteLines.forEach(function (l) { mw = Math.max(mw, measureText(l, n.noteFontSize, ns.italic ? 700 : 400, layout.font.css)); }); return mw; })();
+          nb.setAttribute("x", n.noteX - 5); nb.setAttribute("y", nbTop - 3); nb.setAttribute("width", nbW + 10); nb.setAttribute("height", nbH + 6);
+          nb.setAttribute("rx", 4); nb.setAttribute("fill", "none"); nb.setAttribute("stroke", ns.borderColor); nb.setAttribute("stroke-width", 1.2);
+          g.appendChild(nb);
+        }
+        n.noteLines.forEach(function (ln, i) {
+          var nt = document.createElementNS(SVGNS, "text");
+          nt.setAttribute("x", n.noteX); nt.setAttribute("y", n.noteLineYs[i]);
+          nt.setAttribute("font-size", n.noteFontSize); nt.setAttribute("fill", noteColor);
+          if (ns.italic) nt.setAttribute("font-style", "italic");
+          nt.setAttribute("font-family", layout.font.css.replace(/"/g, "'"));
+          nt.textContent = ln; g.appendChild(nt);
+        });
+      }
+
+      if (interactive) {
+        var hit = document.createElementNS(SVGNS, "rect");
+        hit.setAttribute("x", n.x - 6); hit.setAttribute("y", topY - 4);
+        hit.setAttribute("width", n.effWidth + 12); hit.setAttribute("height", boxH + 8);
+        hit.setAttribute("fill", "transparent");
+        g.appendChild(hit);
+      }
+
+      if (n.hasRealChildren && interactive) {
+        var foldCX = layout.mode === "vertical" ? (n.x - 12) : (contentX + n.textWidth + 13);
+        var foldCY = n.textY - n.fontSize * 0.32;
+        var foldHit = document.createElementNS(SVGNS, "circle");
+        foldHit.setAttribute("class", "foldui");
+        foldHit.setAttribute("cx", foldCX); foldHit.setAttribute("cy", foldCY); foldHit.setAttribute("r", 9);
+        foldHit.setAttribute("fill", n.childrenVisible ? "#FFFFFF" : "#F2F2F0");
+        foldHit.setAttribute("stroke", "#111111"); foldHit.setAttribute("stroke-width", 1.1);
+        foldHit.style.cursor = "pointer";
+        foldHit.addEventListener("click", function (e) { e.stopPropagation(); toggleNodeVisibility(n.id); });
+        g.appendChild(foldHit);
+        var foldMark = document.createElementNS(SVGNS, "text");
+        foldMark.setAttribute("class", "foldui");
+        foldMark.setAttribute("x", foldCX); foldMark.setAttribute("y", foldCY + 3.5);
+        foldMark.setAttribute("text-anchor", "middle"); foldMark.setAttribute("font-size", 11); foldMark.setAttribute("fill", "#111111");
+        foldMark.style.cursor = "pointer";
+        foldMark.textContent = n.childrenVisible ? "−" : "+";
+        foldMark.addEventListener("click", function (e) { e.stopPropagation(); toggleNodeVisibility(n.id); });
+        g.appendChild(foldMark);
+      }
+
+      if (n.badge) { drawBadgeShape(g, n.badge.shape || "circle", n.x + n.effWidth, topY, 7, n.badge.color || "#E5484D"); }
+
+      if (interactive && state.multiSelectMode && state.selectedIds.has(n.id)) {
+        var msel = document.createElementNS(SVGNS, "rect");
+        msel.setAttribute("x", n.x - 6); msel.setAttribute("y", topY - 4); msel.setAttribute("width", n.effWidth + 12); msel.setAttribute("height", boxH + 8);
+        msel.setAttribute("rx", 8); msel.setAttribute("fill", "rgba(17,17,17,0.06)"); msel.setAttribute("stroke", "#111111"); msel.setAttribute("stroke-width", 2);
+        g.appendChild(msel);
+        var chk = document.createElementNS(SVGNS, "circle");
+        chk.setAttribute("cx", n.x - 6); chk.setAttribute("cy", topY - 4); chk.setAttribute("r", 7);
+        chk.setAttribute("fill", "#111111"); chk.setAttribute("stroke", "#FFFFFF"); chk.setAttribute("stroke-width", 1.5);
+        g.appendChild(chk);
+        var chkMark = document.createElementNS(SVGNS, "text");
+        chkMark.setAttribute("x", n.x - 6); chkMark.setAttribute("y", topY - 1);
+        chkMark.setAttribute("text-anchor", "middle"); chkMark.setAttribute("font-size", 9); chkMark.setAttribute("fill", "#FFFFFF");
+        chkMark.textContent = "✓";
+        g.appendChild(chkMark);
+      } else if (interactive && !state.multiSelectMode && state.selectedId === n.id) {
+        var sel = document.createElementNS(SVGNS, "rect");
+        sel.setAttribute("x", n.x - 6); sel.setAttribute("y", topY - 4); sel.setAttribute("width", n.effWidth + 12); sel.setAttribute("height", boxH + 8);
+        sel.setAttribute("rx", 8); sel.setAttribute("fill", "none"); sel.setAttribute("stroke", "#111111"); sel.setAttribute("stroke-width", 1.4); sel.setAttribute("stroke-dasharray", "5 3");
+        g.appendChild(sel);
+      }
+      if (interactive) {
+        g.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (state.multiSelectMode) toggleMultiSelect(n.id); else selectNode(n.id);
+        });
+      }
+      svgEl.appendChild(g);
+    });
+  }
+
+  var svgEl = document.getElementById("treeSvg");
+
+  var lastLayout = null;
+  function renderSVG() {
+    var layout = computeLayout();
+    lastLayout = layout;
+    drawLayoutToSvg(svgEl, layout, true);
+    document.getElementById("dimsLbl").textContent = Math.round(Math.max(layout.width, 320)) + " × " + Math.round(Math.max(layout.height, 160)) + " px";
+    applyZoom();
+  }
+  var diagramTimer = null;
+  function scheduleDiagramRender() { clearTimeout(diagramTimer); diagramTimer = setTimeout(renderSVG, 120); }
+  function applyZoom() {
+    var frame = document.getElementById("canvasFrame");
+    frame.style.transform = "scale(" + state.zoom + ")"; frame.style.transformOrigin = "top left";
+    document.getElementById("zoomLbl").textContent = Math.round(state.zoom * 100) + "%";
+  }
+
+  // run `action` with some state fields temporarily swapped, e.g. to
+  // render/export a different document's data without touching the
+  // document currently open in the editor.
+  function withTempState(fields, action) {
+    var backup = {};
+    Object.keys(fields).forEach(function (k) { backup[k] = state[k]; state[k] = fields[k]; });
+    action();
+    Object.keys(fields).forEach(function (k) { state[k] = backup[k]; });
+  }
+  function renderReadonlySvgFor(doc, svgTarget) {
+    withTempState({
+      items: doc.items || [], fontId: doc.fontId || "noto-sans", levelSettings: doc.levelSettings || {},
+      lineWidth: typeof doc.lineWidth === "number" ? doc.lineWidth : 1,
+      omitRootTitle: !!doc.omitRootTitle, maxDisplayLevel: doc.maxDisplayLevel == null ? null : doc.maxDisplayLevel,
+      selectedId: null, zoomRootId: null,
+    }, function () { var layout = computeLayout(); drawLayoutToSvg(svgTarget, layout, false); });
+  }
+  // ---------------------------------------------------------------------
+  // node selection + edit panel
+  // ---------------------------------------------------------------------
+  var nodeOverlay = document.getElementById("nodeOverlay");
+  var nodePanel = document.getElementById("nodePanel");
+
+  // ---------------------------------------------------------------------
+  // multi-select + bulk edit
+  // ---------------------------------------------------------------------
+  var selectionBar = document.getElementById("selectionBar");
+  function toggleMultiSelect(id) {
+    if (state.selectedIds.has(id)) state.selectedIds.delete(id); else state.selectedIds.add(id);
+    renderSVG(); renderList(); renderSelectionBar();
+  }
+  function renderSelectionBar() {
+    var n = state.selectedIds.size;
+    selectionBar.classList.toggle("show", state.multiSelectMode && n > 0);
+    if (n === 0) return;
+    selectionBar.innerHTML = "";
+    var count = document.createElement("span"); count.className = "selCount"; count.textContent = n + "개 선택됨";
+    selectionBar.appendChild(count);
+    var btns = document.createElement("div"); btns.className = "selBtns";
+    var editBtn = document.createElement("button"); editBtn.className = "selBtn primary"; editBtn.textContent = "일괄 편집";
+    editBtn.addEventListener("click", openBulkPanel);
+    var indentBtn = document.createElement("button"); indentBtn.className = "selBtn"; indentBtn.textContent = "들여쓰기";
+    indentBtn.addEventListener("click", function () { bulkChangeLevel(1); });
+    var outdentBtn = document.createElement("button"); outdentBtn.className = "selBtn"; outdentBtn.textContent = "내어쓰기";
+    outdentBtn.addEventListener("click", function () { bulkChangeLevel(-1); });
+    var clearBtn = document.createElement("button"); clearBtn.className = "selBtn"; clearBtn.textContent = "선택 해제";
+    clearBtn.addEventListener("click", function () { state.selectedIds.clear(); renderSVG(); renderList(); renderSelectionBar(); });
+    var delBtn = document.createElement("button"); delBtn.className = "selBtn"; delBtn.textContent = "삭제";
+    delBtn.addEventListener("click", function () {
+      if (!window.confirm(n + "개 항목을 삭제할까요? 하위 항목도 함께 삭제됩니다.")) return;
+      var ids = Array.from(state.selectedIds);
+      ids.forEach(function (id) { if (indexOfId(id) >= 0) deleteItem(id); });
+      state.selectedIds.clear(); renderSelectionBar();
+    });
+    btns.appendChild(editBtn); btns.appendChild(indentBtn); btns.appendChild(outdentBtn); btns.appendChild(clearBtn); btns.appendChild(delBtn);
+    selectionBar.appendChild(btns);
+  }
+  // Selected items whose parent isn't also selected — indenting/outdenting only these
+  // (each already carries its own subtree, including any selected descendants) avoids
+  // shifting a nested selection twice.
+  function selectedRootIds() {
+    return Array.from(state.selectedIds).filter(function (id) {
+      var idx = indexOfId(id);
+      if (idx < 0) return false;
+      var curLevel = state.items[idx].level;
+      for (var i = idx - 1; i >= 0 && curLevel > 0; i--) {
+        if (state.items[i].level < curLevel) {
+          if (state.selectedIds.has(state.items[i].id)) return false;
+          curLevel = state.items[i].level;
+        }
+      }
+      return true;
+    });
+  }
+  function bulkChangeLevel(dir) {
+    var roots = selectedRootIds();
+    roots.forEach(function (id) {
+      if (indexOfId(id) < 0) return;
+      if (dir > 0) indentItem(id); else outdentItem(id);
+    });
+    renderSelectionBar();
+  }
+
+  var bulkOverlay = document.getElementById("bulkOverlay");
+  var bulkPanel = document.getElementById("bulkPanel");
+  var bulkChanges = {};
+  function bulkField(labelHtml, controlEl, applyChk) {
+    var wrap = document.createElement("div"); wrap.className = "npField";
+    var row = document.createElement("div"); row.className = "npLabelRow";
+    row.innerHTML = '<span class="npLabel">' + labelHtml + "</span>";
+    row.appendChild(applyChk);
+    wrap.appendChild(row); wrap.appendChild(controlEl);
+    return wrap;
+  }
+  function mkApplyChk() {
+    var lbl = document.createElement("label"); lbl.className = "npToggle";
+    var chk = document.createElement("input"); chk.type = "checkbox";
+    lbl.appendChild(chk); lbl.appendChild(document.createTextNode("적용"));
+    return { label: lbl, chk: chk };
+  }
+  function openBulkPanel() {
+    bulkChanges = {};
+    bulkPanel.innerHTML = "";
+    var head = document.createElement("div"); head.className = "modal-head";
+    head.innerHTML = '<span class="eyebrow" style="color:var(--ink)">' + state.selectedIds.size + "개 항목 일괄 편집</span>";
+    var closeBtn = document.createElement("button"); closeBtn.className = "close-x"; closeBtn.innerHTML = ICONS.x;
+    closeBtn.addEventListener("click", function () { bulkOverlay.classList.remove("show"); });
+    head.appendChild(closeBtn); bulkPanel.appendChild(head);
+
+    var hint = document.createElement("p"); hint.className = "hint"; hint.style.marginBottom = "14px";
+    hint.textContent = "바꿀 속성만 \"적용\" 체크 후 값을 설정하세요. 체크하지 않은 속성은 그대로 유지됩니다.";
+    bulkPanel.appendChild(hint);
+
+    // font size
+    var fsA = mkApplyChk();
+    var fsInput = document.createElement("input"); fsInput.type = "number"; fsInput.className = "npInput"; fsInput.placeholder = "px";
+    fsInput.addEventListener("input", function () { bulkChanges.fontSize = fsInput.value ? parseInt(fsInput.value, 10) : null; });
+    bulkPanel.appendChild(bulkField("글자 크기", fsInput, fsA.label));
+
+    // bold
+    var boldA = mkApplyChk();
+    var boldSel = document.createElement("select"); boldSel.className = "npSelect";
+    [["normal", "보통"], ["bold", "굵게"]].forEach(function (o) { var opt = document.createElement("option"); opt.value = o[0]; opt.textContent = o[1]; boldSel.appendChild(opt); });
+    boldSel.addEventListener("change", function () { bulkChanges.bold = boldSel.value === "bold"; });
+    bulkPanel.appendChild(bulkField("굵기", boldSel, boldA.label));
+
+    // underline
+    var ulA = mkApplyChk();
+    var ulSel = document.createElement("select"); ulSel.className = "npSelect";
+    [["off", "없음"], ["on", "밑줄"]].forEach(function (o) { var opt = document.createElement("option"); opt.value = o[0]; opt.textContent = o[1]; ulSel.appendChild(opt); });
+    ulSel.addEventListener("change", function () { bulkChanges.underline = ulSel.value === "on"; });
+    bulkPanel.appendChild(bulkField("밑줄", ulSel, ulA.label));
+
+    // checkbox display
+    var cbA = mkApplyChk();
+    var cbSel = document.createElement("select"); cbSel.className = "npSelect";
+    [["off", "표시 안 함"], ["on", "표시"]].forEach(function (o) { var opt = document.createElement("option"); opt.value = o[0]; opt.textContent = o[1]; cbSel.appendChild(opt); });
+    cbSel.addEventListener("change", function () { bulkChanges.checkbox = cbSel.value === "on"; });
+    bulkPanel.appendChild(bulkField("체크박스 표시", cbSel, cbA.label));
+
+    // box
+    var boxA = mkApplyChk();
+    var boxRow = document.createElement("div"); boxRow.className = "npColorRow";
+    var boxOnSel = document.createElement("select"); boxOnSel.className = "npSelect"; boxOnSel.style.flexShrink = "0"; boxOnSel.style.width = "110px";
+    [["off", "상자 끄기"], ["on", "상자 켜기"]].forEach(function (o) { var opt = document.createElement("option"); opt.value = o[0]; opt.textContent = o[1]; boxOnSel.appendChild(opt); });
+    var boxColorInput = document.createElement("input"); boxColorInput.type = "color"; boxColorInput.value = "#FFFFFF";
+    boxOnSel.addEventListener("change", function () { bulkChanges.box = boxOnSel.value === "on"; });
+    boxColorInput.addEventListener("input", function () { bulkChanges.boxColor = boxColorInput.value; });
+    boxRow.appendChild(boxOnSel); boxRow.appendChild(boxColorInput);
+    bulkPanel.appendChild(bulkField("상자", boxRow, boxA.label));
+
+    // highlight
+    var hlA = mkApplyChk();
+    var hlRow = document.createElement("div"); hlRow.className = "npColorRow";
+    var hlOnSel = document.createElement("select"); hlOnSel.className = "npSelect"; hlOnSel.style.flexShrink = "0"; hlOnSel.style.width = "110px";
+    [["off", "끄기"], ["on", "켜기"]].forEach(function (o) { var opt = document.createElement("option"); opt.value = o[0]; opt.textContent = o[1]; hlOnSel.appendChild(opt); });
+    var hlColorInput = document.createElement("input"); hlColorInput.type = "color"; hlColorInput.value = "#FFF07A";
+    hlOnSel.addEventListener("change", function () { bulkChanges.highlight = hlOnSel.value === "on" ? hlColorInput.value : null; });
+    hlColorInput.addEventListener("input", function () { if (hlOnSel.value === "on") bulkChanges.highlight = hlColorInput.value; });
+    hlRow.appendChild(hlOnSel); hlRow.appendChild(hlColorInput);
+    bulkPanel.appendChild(bulkField("하이라이트", hlRow, hlA.label));
+
+    // badge
+    var bdA = mkApplyChk();
+    var bdRow = document.createElement("div"); bdRow.className = "npColorRow";
+    var bdOnSel = document.createElement("select"); bdOnSel.className = "npSelect"; bdOnSel.style.flexShrink = "0"; bdOnSel.style.width = "90px";
+    [["off", "끄기"], ["on", "켜기"]].forEach(function (o) { var opt = document.createElement("option"); opt.value = o[0]; opt.textContent = o[1]; bdOnSel.appendChild(opt); });
+    var bdShapeSel = document.createElement("select"); bdShapeSel.className = "npSelect"; bdShapeSel.style.flexShrink = "0"; bdShapeSel.style.width = "100px";
+    BADGE_SHAPES.forEach(function (s) { var opt = document.createElement("option"); opt.value = s; opt.textContent = s; bdShapeSel.appendChild(opt); });
+    var bdColorInput = document.createElement("input"); bdColorInput.type = "color"; bdColorInput.value = "#E5484D";
+    function syncBadgeBulk() { bulkChanges.badge = bdOnSel.value === "on" ? { shape: bdShapeSel.value, color: bdColorInput.value } : null; }
+    bdOnSel.addEventListener("change", syncBadgeBulk); bdShapeSel.addEventListener("change", syncBadgeBulk); bdColorInput.addEventListener("input", syncBadgeBulk);
+    bdRow.appendChild(bdOnSel); bdRow.appendChild(bdShapeSel); bdRow.appendChild(bdColorInput);
+    bulkPanel.appendChild(bulkField("우상단 마커", bdRow, bdA.label));
+
+    var applyAllBtn = document.createElement("button");
+    applyAllBtn.className = "primary-btn"; applyAllBtn.style.width = "100%"; applyAllBtn.style.justifyContent = "center"; applyAllBtn.style.marginTop = "6px";
+    applyAllBtn.textContent = "선택한 " + state.selectedIds.size + "개에 적용";
+    applyAllBtn.addEventListener("click", function () {
+      var applyMap = {
+        fontSize: fsA.chk.checked, bold: boldA.chk.checked, underline: ulA.chk.checked, checkbox: cbA.chk.checked,
+        box: boxA.chk.checked, boxColor: boxA.chk.checked && boxOnSel.value === "on", highlight: hlA.chk.checked, badge: bdA.chk.checked,
+      };
+      state.selectedIds.forEach(function (id) {
+        var it = getItemById(id); if (!it) return;
+        if (applyMap.fontSize) it.fontSize = bulkChanges.fontSize;
+        if (applyMap.bold) it.bold = bulkChanges.bold;
+        if (applyMap.underline) it.underline = bulkChanges.underline;
+        if (applyMap.checkbox) it.checkbox = bulkChanges.checkbox;
+        if (applyMap.box) { it.box = bulkChanges.box; if (it.box && applyMap.boxColor) it.boxColor = bulkChanges.boxColor; }
+        if (applyMap.highlight) it.highlight = bulkChanges.highlight;
+        if (applyMap.badge) it.badge = bulkChanges.badge;
+      });
+      renderList(); scheduleDiagramRender();
+      bulkOverlay.classList.remove("show");
+    });
+    bulkPanel.appendChild(applyAllBtn);
+    bulkOverlay.classList.add("show");
+  }
+  bulkOverlay.addEventListener("click", function (e) { if (e.target === bulkOverlay) bulkOverlay.classList.remove("show"); });
+
+  function selectNode(id) {
+    state.selectedId = id;
+    state.nodePanelView = "menu";
+    renderSVG();
+    if (id) { renderNodePanel(id); nodeOverlay.classList.add("show"); }
+    else { nodeOverlay.classList.remove("show"); }
+  }
+
+  function fmtHint(text, maxLen) { if (!text) return ""; return text.length > maxLen ? text.slice(0, maxLen) + "…" : text; }
+  function menuRow(label, hint, onClick) {
+    var row = document.createElement("button"); row.type = "button"; row.className = "menuRow";
+    var left = document.createElement("span"); left.className = "menuRowLabel"; left.textContent = label;
+    row.appendChild(left);
+    var right = document.createElement("span"); right.className = "menuRowRight";
+    if (hint) { var h = document.createElement("span"); h.className = "menuRowHint"; h.textContent = hint; right.appendChild(h); }
+    var chev = document.createElement("span"); chev.className = "menuRowChevron"; chev.innerHTML = ICONS.chevRightSmall;
+    right.appendChild(chev);
+    row.appendChild(right);
+    row.addEventListener("click", onClick);
+    return row;
+  }
+  function menuToggleRow(label, checked, onChange) {
+    var row = document.createElement("label"); row.className = "menuToggleRow";
+    var span = document.createElement("span"); span.textContent = label;
+    var chk = document.createElement("input"); chk.type = "checkbox"; chk.checked = checked;
+    chk.addEventListener("change", function () { onChange(chk.checked); });
+    row.appendChild(span); row.appendChild(chk);
+    return row;
+  }
+  function detailHeader(id, title) {
+    var wrap = document.createElement("div"); wrap.className = "detailBackRow";
+    var backBtn = document.createElement("button"); backBtn.className = "detailBackBtn";
+    backBtn.innerHTML = ICONS.chevL + "<span>메뉴</span>";
+    backBtn.addEventListener("click", function () { state.nodePanelView = "menu"; renderNodePanel(id); });
+    var titleSpan = document.createElement("span"); titleSpan.className = "detailTitle"; titleSpan.textContent = title;
+    var closeBtn = document.createElement("button"); closeBtn.className = "close-x"; closeBtn.innerHTML = ICONS.x;
+    closeBtn.addEventListener("click", function () { selectNode(null); });
+    wrap.appendChild(backBtn); wrap.appendChild(titleSpan); wrap.appendChild(closeBtn);
+    return wrap;
+  }
+
+  function renderNodePanel(id) {
+    if (!state.nodePanelView || state.nodePanelView === "menu") renderNodeMenu(id);
+    else renderNodeDetail(id, state.nodePanelView);
+  }
+
+  function renderNodeMenu(id) {
+    var it = getItemById(id);
+    if (!it) return;
+    nodePanel.innerHTML = "";
+
+    var head = document.createElement("div");
+    head.className = "modal-head";
+    head.innerHTML = '<span class="eyebrow" style="color:var(--ink)">항목 편집</span>';
+    var closeBtn = document.createElement("button");
+    closeBtn.className = "close-x"; closeBtn.innerHTML = ICONS.x;
+    closeBtn.addEventListener("click", function () { selectNode(null); });
+    head.appendChild(closeBtn);
+    nodePanel.appendChild(head);
+
+    var textField = document.createElement("div");
+    textField.className = "npField";
+    textField.innerHTML = '<div class="npLabelRow"><span class="npLabel">텍스트</span></div>';
+    var textInput = document.createElement("input");
+    textInput.className = "npInput"; textInput.value = it.text;
+    textInput.addEventListener("input", function () { it.text = textInput.value; renderList(); scheduleDiagramRender(); });
+    textField.appendChild(textInput);
+    nodePanel.appendChild(textField);
+
+    var menuWrap = document.createElement("div"); menuWrap.className = "menuList";
+
+    var d1 = document.createElement("div"); d1.className = "menuDivider"; d1.textContent = "서식";
+    menuWrap.appendChild(d1);
+    menuWrap.appendChild(menuToggleRow("밑줄", !!it.underline, function (v) { it.underline = v; scheduleDiagramRender(); }));
+    menuWrap.appendChild(menuToggleRow("체크박스 표시", !!it.checkbox, function (v) { it.checkbox = v; scheduleDiagramRender(); renderNodeMenu(id); }));
+    if (it.checkbox) {
+      var doneRow = menuToggleRow("완료로 표시", !!it.checked, function (v) { it.checked = v; scheduleDiagramRender(); });
+      doneRow.style.paddingLeft = "18px";
+      menuWrap.appendChild(doneRow);
+    }
+    var fHint = (it.fontSize ? (it.fontSize + "px") : "자동") + (typeof it.bold === "boolean" ? (it.bold ? " · 굵게" : " · 보통") : "");
+    menuWrap.appendChild(menuRow("글자 크기 · 굵기", fHint, function () { state.nodePanelView = "font"; renderNodePanel(id); }));
+
+    var d0 = document.createElement("div"); d0.className = "menuDivider"; d0.textContent = "노트 & 탐색";
+    menuWrap.appendChild(d0);
+    menuWrap.appendChild(menuRow("MD 노트", it.md ? "작성됨" : "", function () { selectNode(null); openMdPopup(id); }));
+    menuWrap.appendChild(menuRow("이 항목으로 확대(줌인)", "", function () { selectNode(null); zoomTo(id); }));
+
+    var d2 = document.createElement("div"); d2.className = "menuDivider"; d2.textContent = "메모 & 박스";
+    menuWrap.appendChild(d2);
+    menuWrap.appendChild(menuRow("메모", it.note ? fmtHint(it.note, 12) : "", function () { state.nodePanelView = "note"; renderNodePanel(id); }));
+    menuWrap.appendChild(menuRow("참고 박스", it.callout ? "켜짐" : "", function () { state.nodePanelView = "callout"; renderNodePanel(id); }));
+    menuWrap.appendChild(menuRow("상자", it.box ? "켜짐" : "", function () { state.nodePanelView = "box"; renderNodePanel(id); }));
+    menuWrap.appendChild(menuRow("하이라이트", it.highlight ? "켜짐" : "", function () { state.nodePanelView = "highlight"; renderNodePanel(id); }));
+    menuWrap.appendChild(menuRow("우상단 마커", it.badge ? "켜짐" : "", function () { state.nodePanelView = "badge"; renderNodePanel(id); }));
+
+    var idxForChildren = indexOfId(id);
+    if (idxForChildren >= 0 && hasChildren(idxForChildren)) {
+      var d3 = document.createElement("div"); d3.className = "menuDivider"; d3.textContent = "구조";
+      menuWrap.appendChild(d3);
+      var visField = document.createElement("div");
+      visField.className = "npField"; visField.style.padding = "2px 4px 10px";
+      visField.innerHTML = '<div class="npLabelRow"><span class="npLabel" style="font-size:12.5px;">하위 항목 표시</span></div>';
+      var visSel = document.createElement("select");
+      visSel.className = "npSelect";
+      [["", "전체 설정 따름"], ["show", "항상 펼치기"], ["hide", "항상 접기"]].forEach(function (o) { var opt = document.createElement("option"); opt.value = o[0]; opt.textContent = o[1]; visSel.appendChild(opt); });
+      visSel.value = it.levelOverride || "";
+      visSel.addEventListener("change", function () { it.levelOverride = visSel.value || null; scheduleDiagramRender(); });
+      visField.appendChild(visSel);
+      menuWrap.appendChild(visField);
+      menuWrap.appendChild(menuRow("이 가지(분기)", "", function () { state.nodePanelView = "branch"; renderNodePanel(id); }));
+    }
+    nodePanel.appendChild(menuWrap);
+
+    var resetBtn = document.createElement("button");
+    resetBtn.className = "npResetBtn"; resetBtn.textContent = "이 항목 스타일 초기화";
+    resetBtn.addEventListener("click", function () {
+      it.box = false; it.boxColor = null; it.highlight = null; it.note = ""; it.noteStyle = null; it.callout = null; it.fontSize = null; it.bold = null;
+      it.underline = false; it.levelOverride = null; it.checkbox = false; it.checked = false; it.badge = null;
+      renderNodeMenu(id); scheduleDiagramRender();
+    });
+    nodePanel.appendChild(resetBtn);
+
+    var delBtn = document.createElement("button");
+    delBtn.className = "npDangerBtn"; delBtn.style.marginTop = "8px"; delBtn.textContent = "이 항목 삭제";
+    delBtn.addEventListener("click", function () { deleteItem(id); selectNode(null); renderList(); });
+    nodePanel.appendChild(delBtn);
+  }
+
+  function renderNodeDetail(id, section) {
+    var it = getItemById(id);
+    if (!it) { state.nodePanelView = "menu"; return; }
+    nodePanel.innerHTML = "";
+    if (section === "font") renderFontDetail(id, it);
+    else if (section === "note") renderNoteDetail(id, it);
+    else if (section === "callout") renderCalloutDetail(id, it);
+    else if (section === "box") renderBoxDetail(id, it);
+    else if (section === "highlight") renderHighlightDetail(id, it);
+    else if (section === "badge") renderBadgeDetail(id, it);
+    else if (section === "branch") renderBranchDetail(id, it);
+    else renderNodeMenu(id);
+  }
+
+  function renderFontDetail(id, it) {
+    nodePanel.appendChild(detailHeader(id, "글자 크기 · 굵기"));
+    var fontSec = document.createElement("div");
+    fontSec.className = "npField npRow2";
+    var fsWrap = document.createElement("div");
+    fsWrap.innerHTML = '<div class="npLabelRow"><span class="npLabel">글자 크기</span></div>';
+    var fsInput = document.createElement("input");
+    fsInput.type = "number"; fsInput.className = "npInput npSmallNum"; fsInput.placeholder = "자동";
+    fsInput.value = it.fontSize || "";
+    fsInput.addEventListener("input", function () { it.fontSize = fsInput.value ? parseInt(fsInput.value, 10) : null; scheduleDiagramRender(); });
+    fsWrap.appendChild(fsInput);
+    var boldWrap = document.createElement("div");
+    boldWrap.innerHTML = '<div class="npLabelRow"><span class="npLabel">굵기</span></div>';
+    var boldSel = document.createElement("select");
+    boldSel.className = "npSelect";
+    [["auto", "자동(수준 설정)"], ["normal", "보통"], ["bold", "굵게"]].forEach(function (o) { var opt = document.createElement("option"); opt.value = o[0]; opt.textContent = o[1]; boldSel.appendChild(opt); });
+    boldSel.value = typeof it.bold === "boolean" ? (it.bold ? "bold" : "normal") : "auto";
+    boldSel.addEventListener("change", function () { it.bold = boldSel.value === "auto" ? null : (boldSel.value === "bold"); scheduleDiagramRender(); });
+    boldWrap.appendChild(boldSel);
+    fontSec.appendChild(fsWrap); fontSec.appendChild(boldWrap);
+    nodePanel.appendChild(fontSec);
+  }
+
+  function renderNoteDetail(id, it) {
+    nodePanel.appendChild(detailHeader(id, "메모"));
+    var noteField = document.createElement("div");
+    noteField.className = "npField";
+    noteField.innerHTML = '<div class="npLabelRow"><span class="npLabel">작은 글씨 메모</span></div>';
+    var noteArea = document.createElement("textarea");
+    noteArea.className = "npTextarea"; noteArea.placeholder = "항목 아래 작게 표시될 메모";
+    noteArea.value = it.note || "";
+    noteArea.addEventListener("input", function () { it.note = noteArea.value; scheduleDiagramRender(); });
+    noteField.appendChild(noteArea);
+    nodePanel.appendChild(noteField);
+
+    if (!it.noteStyle) it.noteStyle = {};
+    var nsSec = document.createElement("div"); nsSec.className = "npField";
+    var nsRow1 = document.createElement("div"); nsRow1.className = "npRow2";
+    var nsPosWrap = document.createElement("div");
+    nsPosWrap.innerHTML = '<div class="npLabelRow"><span class="npLabel" style="font-size:11px;color:var(--gray-500);">메모 위치</span></div>';
+    var nsPosSel = document.createElement("select"); nsPosSel.className = "npSelect";
+    [["bottom", "아래"], ["top", "위"], ["right", "오른쪽"], ["left", "왼쪽"]].forEach(function (o) { var opt = document.createElement("option"); opt.value = o[0]; opt.textContent = o[1]; nsPosSel.appendChild(opt); });
+    nsPosSel.value = it.noteStyle.position || "bottom";
+    nsPosSel.addEventListener("change", function () { it.noteStyle.position = nsPosSel.value; scheduleDiagramRender(); });
+    nsPosWrap.appendChild(nsPosSel);
+    var nsSizeWrap = document.createElement("div");
+    nsSizeWrap.innerHTML = '<div class="npLabelRow"><span class="npLabel" style="font-size:11px;color:var(--gray-500);">메모 글자크기</span></div>';
+    var nsSizeInput = document.createElement("input"); nsSizeInput.type = "number"; nsSizeInput.className = "npInput npSmallNum"; nsSizeInput.placeholder = "자동";
+    nsSizeInput.value = it.noteStyle.size || "";
+    nsSizeInput.addEventListener("input", function () { it.noteStyle.size = nsSizeInput.value ? parseInt(nsSizeInput.value, 10) : null; scheduleDiagramRender(); });
+    nsSizeWrap.appendChild(nsSizeInput);
+    nsRow1.appendChild(nsPosWrap); nsRow1.appendChild(nsSizeWrap);
+    nsSec.appendChild(nsRow1);
+    var nsRow2 = document.createElement("div"); nsRow2.style.display = "flex"; nsRow2.style.alignItems = "center"; nsRow2.style.gap = "10px"; nsRow2.style.marginTop = "8px";
+    var nsColorInput = document.createElement("input"); nsColorInput.type = "color"; nsColorInput.value = it.noteStyle.color || "#767268";
+    nsColorInput.style.width = "34px"; nsColorInput.style.height = "30px"; nsColorInput.style.border = "1px solid var(--gray-300)"; nsColorInput.style.borderRadius = "6px";
+    nsColorInput.addEventListener("input", function () { it.noteStyle.color = nsColorInput.value; scheduleDiagramRender(); });
+    nsRow2.appendChild(nsColorInput);
+    var nsItalicLabel = document.createElement("label"); nsItalicLabel.className = "npToggle";
+    var nsItalicChk = document.createElement("input"); nsItalicChk.type = "checkbox"; nsItalicChk.checked = typeof it.noteStyle.italic === "boolean" ? it.noteStyle.italic : true;
+    nsItalicChk.addEventListener("change", function () { it.noteStyle.italic = nsItalicChk.checked; scheduleDiagramRender(); });
+    nsItalicLabel.appendChild(nsItalicChk); nsItalicLabel.appendChild(document.createTextNode("기울임"));
+    nsRow2.appendChild(nsItalicLabel);
+    var nsBorderLabel = document.createElement("label"); nsBorderLabel.className = "npToggle";
+    var nsBorderChk = document.createElement("input"); nsBorderChk.type = "checkbox"; nsBorderChk.checked = !!it.noteStyle.border;
+    nsBorderChk.addEventListener("change", function () { it.noteStyle.border = nsBorderChk.checked; scheduleDiagramRender(); });
+    nsBorderLabel.appendChild(nsBorderChk); nsBorderLabel.appendChild(document.createTextNode("테두리"));
+    nsRow2.appendChild(nsBorderLabel);
+    nsSec.appendChild(nsRow2);
+    nodePanel.appendChild(nsSec);
+  }
+
+  function renderBoxDetail(id, it) {
+    nodePanel.appendChild(detailHeader(id, "상자"));
+    var boxSec = document.createElement("div"); boxSec.className = "modal-section";
+    var boxHead = document.createElement("div"); boxHead.className = "npLabelRow"; boxHead.innerHTML = '<span class="npLabel">상자로 표시</span>';
+    var boxToggle = document.createElement("label"); boxToggle.className = "npToggle";
+    var boxChk = document.createElement("input"); boxChk.type = "checkbox"; boxChk.checked = !!it.box;
+    boxToggle.appendChild(boxChk); boxToggle.appendChild(document.createTextNode("켜기")); boxHead.appendChild(boxToggle); boxSec.appendChild(boxHead);
+    var boxColorRow = document.createElement("div"); boxColorRow.className = "npColorRow";
+    var boxColorInput = document.createElement("input"); boxColorInput.type = "color"; boxColorInput.value = it.boxColor || "#FFFFFF";
+    boxColorInput.addEventListener("input", function () { it.boxColor = boxColorInput.value; scheduleDiagramRender(); });
+    boxColorRow.appendChild(boxColorInput);
+    var boxSwatches = document.createElement("div"); boxSwatches.className = "npSwatches";
+    BOX_SWATCHES.forEach(function (c) { var sw = document.createElement("span"); sw.className = "swatch"; sw.style.background = c; sw.addEventListener("click", function () { boxColorInput.value = c; it.boxColor = c; scheduleDiagramRender(); }); boxSwatches.appendChild(sw); });
+    boxColorRow.appendChild(boxSwatches); boxSec.appendChild(boxColorRow);
+    boxChk.addEventListener("change", function () { it.box = boxChk.checked; if (it.box && !it.boxColor) it.boxColor = "#FFFFFF"; scheduleDiagramRender(); });
+    nodePanel.appendChild(boxSec);
+  }
+
+  function renderHighlightDetail(id, it) {
+    nodePanel.appendChild(detailHeader(id, "하이라이트"));
+    var hlSec = document.createElement("div"); hlSec.className = "modal-section";
+    var hlHead = document.createElement("div"); hlHead.className = "npLabelRow"; hlHead.innerHTML = '<span class="npLabel">하이라이트(형광펜)</span>';
+    var hlToggle = document.createElement("label"); hlToggle.className = "npToggle";
+    var hlChk = document.createElement("input"); hlChk.type = "checkbox"; hlChk.checked = !!it.highlight;
+    hlToggle.appendChild(hlChk); hlToggle.appendChild(document.createTextNode("켜기")); hlHead.appendChild(hlToggle); hlSec.appendChild(hlHead);
+    var hlColorRow = document.createElement("div"); hlColorRow.className = "npColorRow";
+    var hlColorInput = document.createElement("input"); hlColorInput.type = "color"; hlColorInput.value = it.highlight || "#FFF07A";
+    hlColorInput.addEventListener("input", function () { it.highlight = hlColorInput.value; scheduleDiagramRender(); });
+    hlColorRow.appendChild(hlColorInput);
+    var hlSwatches = document.createElement("div"); hlSwatches.className = "npSwatches";
+    HIGHLIGHT_SWATCHES.forEach(function (c) { var sw = document.createElement("span"); sw.className = "swatch"; sw.style.background = c; sw.addEventListener("click", function () { hlColorInput.value = c; it.highlight = c; scheduleDiagramRender(); }); hlSwatches.appendChild(sw); });
+    hlColorRow.appendChild(hlSwatches); hlSec.appendChild(hlColorRow);
+    hlChk.addEventListener("change", function () { it.highlight = hlChk.checked ? (it.highlight || "#FFF07A") : null; scheduleDiagramRender(); });
+    nodePanel.appendChild(hlSec);
+  }
+
+  function renderBadgeDetail(id, it) {
+    nodePanel.appendChild(detailHeader(id, "우상단 마커"));
+    var bdSec = document.createElement("div");
+    bdSec.className = "modal-section";
+    var bdHead = document.createElement("div"); bdHead.className = "npLabelRow"; bdHead.innerHTML = '<span class="npLabel">우상단 마커</span>';
+    var bdToggle = document.createElement("label"); bdToggle.className = "npToggle";
+    var bdChk = document.createElement("input"); bdChk.type = "checkbox"; bdChk.checked = !!it.badge;
+    bdToggle.appendChild(bdChk); bdToggle.appendChild(document.createTextNode("켜기"));
+    bdHead.appendChild(bdToggle); bdSec.appendChild(bdHead);
+    var shapeRow = document.createElement("div"); shapeRow.className = "shapeSwatches";
+    var badgeColorInput = document.createElement("input");
+    BADGE_SHAPES.forEach(function (shape) {
+      var sb = document.createElement("button"); sb.type = "button"; sb.className = "shapeBtn" + (it.badge && it.badge.shape === shape ? " active" : "");
+      var svgMini = document.createElementNS(SVGNS, "svg"); svgMini.setAttribute("viewBox", "0 0 20 20"); svgMini.setAttribute("width", "16"); svgMini.setAttribute("height", "16");
+      drawBadgeShape(svgMini, shape, 10, 10, 7, (it.badge && it.badge.color) || "#E5484D");
+      sb.appendChild(svgMini);
+      sb.addEventListener("click", function () {
+        it.badge = it.badge || { shape: "circle", color: "#E5484D" };
+        it.badge.shape = shape;
+        shapeRow.querySelectorAll(".shapeBtn").forEach(function (b) { b.classList.remove("active"); });
+        sb.classList.add("active");
+        scheduleDiagramRender();
+      });
+      shapeRow.appendChild(sb);
+    });
+    bdSec.appendChild(shapeRow);
+    var bdColorRow = document.createElement("div"); bdColorRow.className = "npColorRow"; bdColorRow.style.marginTop = "8px";
+    badgeColorInput.type = "color"; badgeColorInput.value = (it.badge && it.badge.color) || "#E5484D";
+    badgeColorInput.addEventListener("input", function () { it.badge = it.badge || { shape: "circle", color: "#E5484D" }; it.badge.color = badgeColorInput.value; scheduleDiagramRender(); });
+    bdColorRow.appendChild(badgeColorInput);
+    var bdSwatches = document.createElement("div"); bdSwatches.className = "npSwatches";
+    BADGE_SWATCHES.forEach(function (c) {
+      var sw = document.createElement("span"); sw.className = "swatch"; sw.style.background = c;
+      sw.addEventListener("click", function () { badgeColorInput.value = c; it.badge = it.badge || { shape: "circle", color: c }; it.badge.color = c; scheduleDiagramRender(); });
+      bdSwatches.appendChild(sw);
+    });
+    bdColorRow.appendChild(bdSwatches);
+    bdSec.appendChild(bdColorRow);
+    bdChk.addEventListener("change", function () { it.badge = bdChk.checked ? (it.badge || { shape: "circle", color: "#E5484D" }) : null; scheduleDiagramRender(); });
+    nodePanel.appendChild(bdSec);
+  }
+
+  function renderCalloutDetail(id, it) {
+    nodePanel.appendChild(detailHeader(id, "참고 박스"));
+    var coSec = document.createElement("div"); coSec.className = "modal-section";
+    var coHead = document.createElement("div"); coHead.className = "npLabelRow"; coHead.innerHTML = '<span class="npLabel">옆으로 뺀 설명 박스</span>';
+    var coToggle = document.createElement("label"); coToggle.className = "npToggle";
+    var coChk = document.createElement("input"); coChk.type = "checkbox"; coChk.checked = !!it.callout;
+    coToggle.appendChild(coChk); coToggle.appendChild(document.createTextNode("켜기")); coHead.appendChild(coToggle); coSec.appendChild(coHead);
+    var coArea = document.createElement("textarea"); coArea.className = "npTextarea"; coArea.placeholder = "설명 박스에 들어갈 내용"; coArea.style.marginBottom = "8px";
+    coArea.value = it.callout ? it.callout.text : ""; coArea.disabled = !it.callout;
+    coArea.addEventListener("input", function () { if (it.callout) { it.callout.text = coArea.value; scheduleDiagramRender(); } });
+    coSec.appendChild(coArea);
+    var coRow = document.createElement("div"); coRow.className = "npRow2";
+    var dxWrap = document.createElement("div"); dxWrap.innerHTML = '<div class="npLabelRow"><span class="npLabel">가로 위치</span></div>';
+    var dxInput = document.createElement("input"); dxInput.type = "number"; dxInput.className = "npInput npSmallNum"; dxInput.value = it.callout ? it.callout.dx : 60; dxInput.disabled = !it.callout;
+    dxInput.addEventListener("input", function () { if (it.callout) { it.callout.dx = parseFloat(dxInput.value) || 0; scheduleDiagramRender(); } });
+    dxWrap.appendChild(dxInput);
+    var dyWrap = document.createElement("div"); dyWrap.innerHTML = '<div class="npLabelRow"><span class="npLabel">세로 위치</span></div>';
+    var dyInput = document.createElement("input"); dyInput.type = "number"; dyInput.className = "npInput npSmallNum"; dyInput.value = it.callout ? it.callout.dy : -46; dyInput.disabled = !it.callout;
+    dyInput.addEventListener("input", function () { if (it.callout) { it.callout.dy = parseFloat(dyInput.value) || 0; scheduleDiagramRender(); } });
+    dyWrap.appendChild(dyInput);
+    coRow.appendChild(dxWrap); coRow.appendChild(dyWrap); coSec.appendChild(coRow);
+
+    var presetRow = document.createElement("div"); presetRow.style.display = "flex"; presetRow.style.gap = "6px"; presetRow.style.marginTop = "8px";
+    var PRESETS = [["위", 0, -90], ["아래", 0, 90], ["왼쪽", -170, 0], ["오른쪽", 90, 0]];
+    PRESETS.forEach(function (p) {
+      var pb = document.createElement("button"); pb.type = "button"; pb.className = "tbtn"; pb.style.fontSize = "11px"; pb.style.padding = "5px 9px"; pb.textContent = p[0];
+      pb.addEventListener("click", function () {
+        if (!it.callout) return;
+        it.callout.dx = p[1]; it.callout.dy = p[2]; dxInput.value = p[1]; dyInput.value = p[2]; scheduleDiagramRender();
+      });
+      presetRow.appendChild(pb);
+    });
+    coSec.appendChild(presetRow);
+
+    if (!it.callout) it.callout = null;
+    var coStyleRow1 = document.createElement("div"); coStyleRow1.style.display = "flex"; coStyleRow1.style.alignItems = "center"; coStyleRow1.style.gap = "10px"; coStyleRow1.style.marginTop = "10px";
+    var coColorInput = document.createElement("input"); coColorInput.type = "color"; coColorInput.value = (it.callout && it.callout.color) || "#111111";
+    coColorInput.style.width = "34px"; coColorInput.style.height = "30px"; coColorInput.style.border = "1px solid var(--gray-300)"; coColorInput.style.borderRadius = "6px"; coColorInput.disabled = !it.callout;
+    coColorInput.addEventListener("input", function () { if (it.callout) { it.callout.color = coColorInput.value; scheduleDiagramRender(); } });
+    coStyleRow1.appendChild(coColorInput);
+    var coItalicLabel = document.createElement("label"); coItalicLabel.className = "npToggle";
+    var coItalicChk = document.createElement("input"); coItalicChk.type = "checkbox"; coItalicChk.checked = !!(it.callout && it.callout.italic); coItalicChk.disabled = !it.callout;
+    coItalicChk.addEventListener("change", function () { if (it.callout) { it.callout.italic = coItalicChk.checked; scheduleDiagramRender(); } });
+    coItalicLabel.appendChild(coItalicChk); coItalicLabel.appendChild(document.createTextNode("기울임"));
+    coStyleRow1.appendChild(coItalicLabel);
+    var coSizeInput = document.createElement("input"); coSizeInput.type = "number"; coSizeInput.placeholder = "자동"; coSizeInput.className = "npInput npSmallNum"; coSizeInput.style.width = "64px";
+    coSizeInput.value = (it.callout && it.callout.size) || ""; coSizeInput.disabled = !it.callout;
+    coSizeInput.addEventListener("input", function () { if (it.callout) { it.callout.size = coSizeInput.value ? parseInt(coSizeInput.value, 10) : null; scheduleDiagramRender(); } });
+    coStyleRow1.appendChild(coSizeInput);
+    coSec.appendChild(coStyleRow1);
+
+    var coStyleRow2 = document.createElement("div"); coStyleRow2.className = "npRow2"; coStyleRow2.style.marginTop = "8px";
+    var coBorderWrap = document.createElement("div");
+    coBorderWrap.innerHTML = '<div class="npLabelRow"><span class="npLabel" style="font-size:11px;color:var(--gray-500);">테두리 색 · 굵기</span></div>';
+    var coBorderColorInput = document.createElement("input"); coBorderColorInput.type = "color"; coBorderColorInput.value = (it.callout && it.callout.borderColor) || "#111111";
+    coBorderColorInput.style.width = "34px"; coBorderColorInput.style.height = "30px"; coBorderColorInput.style.border = "1px solid var(--gray-300)"; coBorderColorInput.style.borderRadius = "6px"; coBorderColorInput.disabled = !it.callout;
+    coBorderColorInput.addEventListener("input", function () { if (it.callout) { it.callout.borderColor = coBorderColorInput.value; scheduleDiagramRender(); } });
+    coBorderWrap.appendChild(coBorderColorInput);
+    var coBorderWInput = document.createElement("input"); coBorderWInput.type = "number"; coBorderWInput.step = "0.5"; coBorderWInput.className = "npInput npSmallNum"; coBorderWInput.style.marginTop = "6px";
+    coBorderWInput.value = (it.callout && it.callout.borderWidth) || 1.4; coBorderWInput.disabled = !it.callout;
+    coBorderWInput.addEventListener("input", function () { if (it.callout) { it.callout.borderWidth = parseFloat(coBorderWInput.value) || 1.4; scheduleDiagramRender(); } });
+    coBorderWrap.appendChild(coBorderWInput);
+    var coLineWrap = document.createElement("div");
+    coLineWrap.innerHTML = '<div class="npLabelRow"><span class="npLabel" style="font-size:11px;color:var(--gray-500);">연결선 색 · 굵기</span></div>';
+    var coLineColorInput = document.createElement("input"); coLineColorInput.type = "color"; coLineColorInput.value = (it.callout && it.callout.lineColor) || "#111111";
+    coLineColorInput.style.width = "34px"; coLineColorInput.style.height = "30px"; coLineColorInput.style.border = "1px solid var(--gray-300)"; coLineColorInput.style.borderRadius = "6px"; coLineColorInput.disabled = !it.callout;
+    coLineColorInput.addEventListener("input", function () { if (it.callout) { it.callout.lineColor = coLineColorInput.value; scheduleDiagramRender(); } });
+    coLineWrap.appendChild(coLineColorInput);
+    var coLineWInput = document.createElement("input"); coLineWInput.type = "number"; coLineWInput.step = "0.5"; coLineWInput.placeholder = "자동"; coLineWInput.className = "npInput npSmallNum"; coLineWInput.style.marginTop = "6px";
+    coLineWInput.value = (it.callout && it.callout.lineWidth) || ""; coLineWInput.disabled = !it.callout;
+    coLineWInput.addEventListener("input", function () { if (it.callout) { it.callout.lineWidth = coLineWInput.value ? parseFloat(coLineWInput.value) : null; scheduleDiagramRender(); } });
+    coLineWrap.appendChild(coLineWInput);
+    coStyleRow2.appendChild(coBorderWrap); coStyleRow2.appendChild(coLineWrap);
+    coSec.appendChild(coStyleRow2);
+
+    var coDashLabel = document.createElement("label"); coDashLabel.className = "npToggle"; coDashLabel.style.marginTop = "8px";
+    var coDashChk = document.createElement("input"); coDashChk.type = "checkbox"; coDashChk.checked = it.callout ? (it.callout.dashed !== false) : true; coDashChk.disabled = !it.callout;
+    coDashChk.addEventListener("change", function () { if (it.callout) { it.callout.dashed = coDashChk.checked; scheduleDiagramRender(); } });
+    coDashLabel.appendChild(coDashChk); coDashLabel.appendChild(document.createTextNode("점선 연결선"));
+    coSec.appendChild(coDashLabel);
+
+    var coStyleInputs = [coColorInput, coItalicChk, coSizeInput, coBorderColorInput, coBorderWInput, coLineColorInput, coLineWInput, coDashChk];
+    coChk.addEventListener("change", function () {
+      if (coChk.checked) it.callout = it.callout || { text: "", dx: 60, dy: -46 }; else it.callout = null;
+      var disabled = !it.callout;
+      coArea.disabled = disabled; dxInput.disabled = disabled; dyInput.disabled = disabled;
+      coStyleInputs.forEach(function (el) { el.disabled = disabled; });
+      if (it.callout) { coArea.value = it.callout.text; dxInput.value = it.callout.dx; dyInput.value = it.callout.dy; }
+      scheduleDiagramRender();
+    });
+    nodePanel.appendChild(coSec);
+  }
+
+  function renderBranchDetail(id, it) {
+    nodePanel.appendChild(detailHeader(id, "이 가지(분기)"));
+    var branchSec = document.createElement("div"); branchSec.className = "modal-section";
+    var copyBranchBtn = document.createElement("button");
+    copyBranchBtn.className = "npSecondaryBtn"; copyBranchBtn.style.marginTop = "0"; copyBranchBtn.innerHTML = ICONS.branch + ' <span style="margin-left:6px;">새 문서로 라이브러리에 복사</span>';
+    copyBranchBtn.style.display = "flex"; copyBranchBtn.style.alignItems = "center"; copyBranchBtn.style.justifyContent = "center";
+    copyBranchBtn.addEventListener("click", function () { copyBranchToLibrary(id); });
+    branchSec.appendChild(copyBranchBtn);
+    var exportBranchRow = document.createElement("div"); exportBranchRow.style.display = "flex"; exportBranchRow.style.gap = "8px"; exportBranchRow.style.marginTop = "8px";
+    var exportBranchSvg = document.createElement("button"); exportBranchSvg.className = "npSecondaryBtn"; exportBranchSvg.style.marginTop = "0"; exportBranchSvg.textContent = "이 가지만 SVG로 내보내기";
+    exportBranchSvg.addEventListener("click", function () { exportBranch(id, "svg"); });
+    var exportBranchPng = document.createElement("button"); exportBranchPng.className = "npSecondaryBtn"; exportBranchPng.style.marginTop = "0"; exportBranchPng.textContent = "이 가지만 PNG로 내보내기";
+    exportBranchPng.addEventListener("click", function () { exportBranch(id, "png"); });
+    exportBranchRow.appendChild(exportBranchSvg); exportBranchRow.appendChild(exportBranchPng);
+    branchSec.appendChild(exportBranchRow);
+    nodePanel.appendChild(branchSec);
+  }
+
+  nodeOverlay.addEventListener("click", function (e) { if (e.target === nodeOverlay) selectNode(null); });
+
+  // ---------------------------------------------------------------------
+  // per-item MD note popup (attach a markdown note to any item)
+  // ---------------------------------------------------------------------
+  var mdOverlayEl = document.getElementById("mdOverlay");
+  var mdPanelEl = document.getElementById("mdPanel");
+
+  function escapeHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function renderMarkdownToHtml(md) {
+    var raw = (md || "").trim();
+    if (!raw) return "";
+    var html;
+    if (window.marked && typeof window.marked.parse === "function") {
+      try { html = window.marked.parse(raw, { breaks: true, gfm: true }); }
+      catch (e) { html = "<p>" + escapeHtml(raw).replace(/\n/g, "<br>") + "</p>"; }
+    } else {
+      html = "<p>" + escapeHtml(raw).replace(/\n/g, "<br>") + "</p>";
+    }
+    if (window.DOMPurify && typeof window.DOMPurify.sanitize === "function") {
+      html = window.DOMPurify.sanitize(html, { ADD_ATTR: ["target"] });
+    }
+    return html;
+  }
+
+  function openMdPopup(id) {
+    var it = getItemById(id);
+    if (!it) return;
+    mdPopupState.id = id;
+    mdPopupState.mode = it.md && it.md.trim() ? "preview" : "edit";
+    renderMdPopup();
+    mdOverlayEl.classList.add("show");
+  }
+  function closeMdPopup() {
+    mdOverlayEl.classList.remove("show");
+    mdPopupState.id = null;
+    renderList();
+  }
+  mdOverlayEl.addEventListener("click", function (e) { if (e.target === mdOverlayEl) closeMdPopup(); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && mdOverlayEl.classList.contains("show")) closeMdPopup();
+  });
+
+  var mdAutoSaveTimer = null;
+  function scheduleAutoSaveMd() {
+    clearTimeout(mdAutoSaveTimer);
+    mdAutoSaveTimer = setTimeout(function () { saveCurrentDocument(true); }, 700);
+  }
+
+  function exportMdNote(it) {
+    var name = (it.text || "note").trim().replace(/[\\/:*?"<>|]/g, "_").slice(0, 60) || "note";
+    downloadBlob(it.md || "", "text/markdown;charset=utf-8", name + ".md");
+  }
+
+  function renderMdPopup() {
+    var it = getItemById(mdPopupState.id);
+    if (!it) { closeMdPopup(); return; }
+    mdPanelEl.innerHTML = "";
+
+    var head = document.createElement("div"); head.className = "mdModalHead";
+    var titleSpan = document.createElement("span"); titleSpan.className = "mdModalTitle";
+    titleSpan.textContent = it.text && it.text.trim() ? it.text : "(제목 없음)";
+    head.appendChild(titleSpan);
+
+    var tabs = document.createElement("div"); tabs.className = "mdModalTabs";
+    var editTab = document.createElement("button");
+    editTab.className = "tbtn" + (mdPopupState.mode === "edit" ? " active" : ""); editTab.textContent = "편집";
+    editTab.addEventListener("click", function () { mdPopupState.mode = "edit"; renderMdPopup(); });
+    var previewTab = document.createElement("button");
+    previewTab.className = "tbtn" + (mdPopupState.mode === "preview" ? " active" : ""); previewTab.textContent = "미리보기";
+    previewTab.addEventListener("click", function () { mdPopupState.mode = "preview"; renderMdPopup(); });
+    tabs.appendChild(editTab); tabs.appendChild(previewTab);
+    head.appendChild(tabs);
+
+    var closeBtn = document.createElement("button"); closeBtn.className = "close-x"; closeBtn.innerHTML = ICONS.x;
+    closeBtn.addEventListener("click", closeMdPopup);
+    head.appendChild(closeBtn);
+    mdPanelEl.appendChild(head);
+
+    var body = document.createElement("div"); body.className = "mdModalBody";
+    if (mdPopupState.mode === "edit") {
+      var editWrap = document.createElement("div"); editWrap.className = "mdEditWrap";
+
+      var editToolbar = document.createElement("div"); editToolbar.className = "mdEditToolbar";
+      var importBtn = document.createElement("button"); importBtn.className = "tbtn"; importBtn.type = "button";
+      importBtn.innerHTML = ICONS.upload + "<span>MD 파일 불러오기</span>";
+      var importInput = document.createElement("input");
+      importInput.type = "file"; importInput.accept = ".md,.markdown,.txt,text/markdown,text/plain";
+      importInput.style.display = "none";
+      importInput.addEventListener("change", function () {
+        var file = importInput.files && importInput.files[0];
+        if (!file) return;
+        if (it.md && it.md.trim() && !window.confirm("현재 작성 중인 내용을 '" + file.name + "'의 내용으로 덮어씁니다. 계속할까요?")) {
+          importInput.value = ""; return;
+        }
+        var reader = new FileReader();
+        reader.onload = function () {
+          var text = String(reader.result || "");
+          it.md = text;
+          scheduleAutoSaveMd();
+          renderMdPopup();
+        };
+        reader.onerror = function () { window.alert("파일을 읽는 중 오류가 발생했습니다."); };
+        reader.readAsText(file, "utf-8");
+        importInput.value = "";
+      });
+      importBtn.addEventListener("click", function () { importInput.click(); });
+      editToolbar.appendChild(importInput);
+      editToolbar.appendChild(importBtn);
+      editWrap.appendChild(editToolbar);
+
+      var ta = document.createElement("textarea");
+      ta.id = "mdEditArea";
+      ta.value = it.md || "";
+      ta.spellcheck = false;
+      ta.placeholder = "마크다운 문법으로 노트를 작성하세요. (# 제목, **굵게**, - 목록, ``` 코드블록 등)";
+      ta.addEventListener("input", function () {
+        it.md = ta.value;
+        scheduleAutoSaveMd();
+      });
+      editWrap.appendChild(ta);
+      body.appendChild(editWrap);
+    } else {
+      var renderWrap = document.createElement("div"); renderWrap.className = "mdRender";
+      if (it.md && it.md.trim()) {
+        renderWrap.innerHTML = renderMarkdownToHtml(it.md);
+      } else {
+        var empty = document.createElement("div"); empty.className = "mdEmpty";
+        empty.textContent = "아직 작성된 MD 노트가 없습니다. '편집' 탭에서 작성해 보세요.";
+        renderWrap.appendChild(empty);
+      }
+      body.appendChild(renderWrap);
+    }
+    mdPanelEl.appendChild(body);
+
+    var foot = document.createElement("div"); foot.className = "mdModalFoot";
+    var leftFoot = document.createElement("div"); leftFoot.style.display = "flex"; leftFoot.style.gap = "8px"; leftFoot.style.flexWrap = "wrap";
+    var exportBtn = document.createElement("button"); exportBtn.className = "tbtn"; exportBtn.innerHTML = ICONS.download + "<span>MD 내보내기</span>";
+    exportBtn.disabled = !it.md;
+    exportBtn.addEventListener("click", function () { exportMdNote(it); });
+    leftFoot.appendChild(exportBtn);
+    var delBtn = document.createElement("button"); delBtn.className = "tbtn"; delBtn.style.color = "var(--danger)"; delBtn.textContent = "노트 삭제";
+    delBtn.disabled = !it.md;
+    delBtn.addEventListener("click", function () {
+      if (!it.md) return;
+      if (!window.confirm("이 항목의 MD 노트를 삭제할까요? 되돌릴 수 없습니다.")) return;
+      it.md = "";
+      saveCurrentDocument(true);
+      renderMdPopup();
+      renderList();
+    });
+    leftFoot.appendChild(delBtn);
+    foot.appendChild(leftFoot);
+
+    var doneBtn = document.createElement("button"); doneBtn.className = "primary-btn"; doneBtn.textContent = "완료";
+    doneBtn.addEventListener("click", closeMdPopup);
+    foot.appendChild(doneBtn);
+    mdPanelEl.appendChild(foot);
+
+    if (mdPopupState.mode === "edit") {
+      var taEl = document.getElementById("mdEditArea");
+      if (taEl) taEl.focus();
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // export (full diagram + single branch)
+  // ---------------------------------------------------------------------
+  function serializeSvg(fromEl) {
+    var clone = (fromEl || svgEl).cloneNode(true);
+    clone.querySelectorAll("rect[fill='transparent']").forEach(function (r) { r.remove(); });
+    clone.querySelectorAll(".foldui").forEach(function (r) { r.remove(); });
+    var s = new XMLSerializer().serializeToString(clone);
+    return '<?xml version="1.0" standalone="no"?>\r\n' + s;
+  }
+  function downloadBlob(content, type, filename) {
+    var blob = new Blob([content], { type: type });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+  function svgToPng(fromEl, filename, onDone) {
+    var w = parseFloat(fromEl.getAttribute("width")), h = parseFloat(fromEl.getAttribute("height"));
+    var blob = new Blob([serializeSvg(fromEl)], { type: "image/svg+xml;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var img = new Image();
+    img.onload = function () {
+      var scale = 3;
+      var canvas = document.createElement("canvas");
+      canvas.width = w * scale; canvas.height = h * scale;
+      var ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.scale(scale, scale); ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      var a = document.createElement("a"); a.href = canvas.toDataURL("image/png"); a.download = filename; a.click();
+      if (onDone) onDone();
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); alert("PNG 내보내기에 실패했습니다. 다시 시도해 주세요."); if (onDone) onDone(); };
+    img.src = url;
+  }
+  function exportSVG() {
+    var wasSelected = state.selectedId; state.selectedId = null; renderSVG();
+    downloadBlob(serializeSvg(svgEl), "image/svg+xml;charset=utf-8", "tree-diagram.svg");
+    state.selectedId = wasSelected; renderSVG();
+  }
+  function exportPNG() {
+    var wasSelected = state.selectedId; state.selectedId = null; renderSVG();
+    svgToPng(svgEl, "tree-diagram.png", function () { state.selectedId = wasSelected; renderSVG(); });
+  }
+
+  // ---------------------------------------------------------------------
+  // export outline back to plain text (bullet markdown / md headers / indented text)
+  // ---------------------------------------------------------------------
+  function outlineExportItems(omitRoot) {
+    if (!omitRoot) return state.items;
+    return state.items.filter(function (it) { return it.level > 0; })
+      .map(function (it) { return Object.assign({}, it, { level: it.level - 1 }); });
+  }
+  // gathers both the regular note and any box-callout text as export "note" lines
+  function noteLinesForExport(it) {
+    var lines = [];
+    if (it.note) lines = lines.concat(it.note.split("\n"));
+    if (it.callout && it.callout.text) lines = lines.concat(it.callout.text.split("\n"));
+    return lines;
+  }
+  function itemsToOutlineText(format, omitRoot) {
+    var items = outlineExportItems(omitRoot);
+    var lines = [];
+    items.forEach(function (it) {
+      var text = it.text || "";
+      if (it.checkbox) text = (it.checked ? "[x] " : "[ ] ") + text;
+      var noteBits = noteLinesForExport(it);
+      if (format === "md-headers") {
+        var hLevel = Math.min(it.level, 5) + 1; // markdown only goes up to ######
+        lines.push("#".repeat(hLevel) + " " + text);
+        if (noteBits.length) { noteBits.forEach(function (n) { lines.push(n); }); lines.push(""); }
+      } else {
+        var indentUnit = format === "bullets" ? "  " : "    ";
+        var indent = indentUnit.repeat(it.level);
+        lines.push(indent + (format === "bullets" ? "- " + text : text));
+        noteBits.forEach(function (n) { lines.push(indentUnit.repeat(it.level + 1) + n); });
+      }
+    });
+    return lines.join("\n");
+  }
+  function currentOutlineExportText() {
+    var format = document.getElementById("outlineExportFormat").value;
+    var omitRoot = document.getElementById("exportOmitRootChk").checked;
+    return { text: itemsToOutlineText(format, omitRoot), format: format };
+  }
+  function exportOutlineText() {
+    var res = currentOutlineExportText();
+    var title = ((state.currentDocTitle || document.getElementById("docTitleInput").value || "outline") + "").trim() || "outline";
+    var safeName = title.replace(/[\\/:*?"<>|]/g, "_");
+    var ext = res.format === "indent" ? ".txt" : ".md";
+    downloadBlob(res.text, "text/plain;charset=utf-8", safeName + ext);
+  }
+  function fallbackCopyText(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+  function copyOutlineText() {
+    var res = currentOutlineExportText();
+    var btn = document.getElementById("exportOutlineCopyBtn");
+    var orig = btn.textContent;
+    function flash() { btn.textContent = "복사됨!"; setTimeout(function () { btn.textContent = orig; }, 1100); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(res.text).then(flash, function () { fallbackCopyText(res.text); flash(); });
+    } else {
+      fallbackCopyText(res.text); flash();
+    }
+  }
+
+  function extractBranchItems(id) {
+    var idx = indexOfId(id);
+    if (idx < 0) return null;
+    var end = subtreeEnd(idx);
+    var base = state.items[idx].level;
+    return state.items.slice(idx, end).map(function (it) { return Object.assign(deepClone(it), { level: it.level - base }); });
+  }
+  function exportBranch(id, format) {
+    var slice = extractBranchItems(id);
+    if (!slice) return;
+    var tmpSvg = document.createElementNS(SVGNS, "svg");
+    withTempState({ items: slice, omitRootTitle: false, selectedId: null, zoomRootId: null }, function () {
+      var layout = computeLayout();
+      drawLayoutToSvg(tmpSvg, layout, false);
+    });
+    var name = (getItemById(id) && getItemById(id).text ? getItemById(id).text.slice(0, 30) : "branch").replace(/[\\/:*?"<>|]/g, "_");
+    if (format === "svg") downloadBlob(serializeSvg(tmpSvg), "image/svg+xml;charset=utf-8", name + ".svg");
+    else svgToPng(tmpSvg, name + ".png", function () {});
+  }
+  function copyBranchToLibrary(id) {
+    var idx = indexOfId(id);
+    if (idx < 0) return;
+    var slice = extractBranchItems(id).map(function (it) { return Object.assign({}, it, { id: nextId() }); });
+    var title = (state.items[idx].text || "제목 없음");
+    var docId = newDocId();
+    state.library.documents[docId] = {
+      id: docId, title: title, updatedAt: Date.now(), items: slice,
+      fontId: state.fontId, levelSettings: deepClone(state.levelSettings), lineWidth: state.lineWidth,
+      omitRootTitle: false, maxDisplayLevel: null,
+    };
+    state.library.documentOrder.unshift(docId);
+    saveLibrary();
+    alert('"' + title + '" 문서로 라이브러리에 저장했습니다.');
+  }
+  // ---------------------------------------------------------------------
+  // mobile bottom accessory bar
+  // ---------------------------------------------------------------------
+  var mobileBar = document.getElementById("mobileBar");
+  var MOBILE_ACTIONS = [
+    { key: "outdent", label: "내어쓰기", icon: ICONS.outdent }, { key: "indent", label: "들여쓰기", icon: ICONS.indent },
+    { key: "up", label: "위로", icon: ICONS.up }, { key: "down", label: "아래로", icon: ICONS.down }, { key: "del", label: "삭제", icon: ICONS.trash },
+  ];
+  function buildMobileBar() {
+    mobileBar.innerHTML = "";
+    MOBILE_ACTIONS.forEach(function (a) {
+      var btn = document.createElement("button");
+      btn.innerHTML = a.icon + "<span>" + a.label + "</span>";
+      btn.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        var id = state.focusedId; if (!id) return;
+        if (a.key === "outdent") outdentItem(id); else if (a.key === "indent") indentItem(id);
+        else if (a.key === "up") moveItem(id, -1); else if (a.key === "down") moveItem(id, 1); else if (a.key === "del") deleteItem(id);
+        pendingFocusId = id;
+      });
+      mobileBar.appendChild(btn);
+    });
+  }
+  function renderMobileBarVisibility() { mobileBar.classList.toggle("show", !!(state.mobileMode && state.focusedId && state.view === "editor" && !state.multiSelectMode)); }
+
+  // ---------------------------------------------------------------------
+  // settings modal
+  // ---------------------------------------------------------------------
+  var overlay = document.getElementById("overlay");
+  var settingsPanel = document.getElementById("settingsPanel");
+  function renderSettingsPanel() {
+    settingsPanel.innerHTML = "";
+    var head = document.createElement("div"); head.className = "modal-head"; head.innerHTML = '<span class="eyebrow" style="color:var(--ink)">설정</span>';
+    var closeBtn = document.createElement("button"); closeBtn.className = "close-x"; closeBtn.innerHTML = ICONS.x;
+    closeBtn.addEventListener("click", function () { overlay.classList.remove("show"); });
+    head.appendChild(closeBtn); settingsPanel.appendChild(head);
+
+    var sec1 = document.createElement("div"); sec1.className = "modal-section"; sec1.innerHTML = '<span class="modal-section-title">수준별 폰트 크기 · 굵기</span>';
+    settingsPanel.appendChild(sec1);
+    var ml = maxLevel();
+    for (var level = 0; level <= ml; level++) {
+      (function (level) {
+        var s = getLevelSetting(level);
+        var row = document.createElement("div"); row.className = "level-row";
+        var name = document.createElement("span"); name.className = "lname"; name.textContent = (level + 1) + "수준"; row.appendChild(name);
+        var range = document.createElement("input"); range.type = "range"; range.min = 10; range.max = 48; range.value = s.size;
+        range.addEventListener("input", function () {
+          if (!state.levelSettings[level]) state.levelSettings[level] = { size: DEFAULT_LEVEL_SIZE, bold: DEFAULT_LEVEL_BOLD };
+          state.levelSettings[level].size = parseInt(range.value, 10); val.textContent = range.value; scheduleDiagramRender();
+        });
+        row.appendChild(range);
+        var val = document.createElement("span"); val.className = "lval"; val.textContent = s.size; row.appendChild(val);
+        var label = document.createElement("label"); label.className = "chk";
+        var chk = document.createElement("input"); chk.type = "checkbox"; chk.checked = !!s.bold;
+        chk.addEventListener("change", function () {
+          if (!state.levelSettings[level]) state.levelSettings[level] = { size: DEFAULT_LEVEL_SIZE, bold: DEFAULT_LEVEL_BOLD };
+          state.levelSettings[level].bold = chk.checked; scheduleDiagramRender();
+        });
+        label.appendChild(chk); label.appendChild(document.createTextNode("굵게")); row.appendChild(label);
+        sec1.appendChild(row);
+      })(level);
+    }
+
+    var sec2 = document.createElement("div"); sec2.className = "modal-section"; sec2.innerHTML = '<span class="modal-section-title">연결선 굵기</span>';
+    var lwRow = document.createElement("div"); lwRow.className = "level-row";
+    var lwRange2 = document.createElement("input"); lwRange2.type = "range"; lwRange2.min = 1; lwRange2.max = 8; lwRange2.step = 0.5; lwRange2.value = state.lineWidth;
+    var lwVal2 = document.createElement("span"); lwVal2.className = "lval"; lwVal2.textContent = state.lineWidth;
+    lwRange2.addEventListener("input", function () { state.lineWidth = parseFloat(lwRange2.value); lwVal2.textContent = lwRange2.value; syncLineWidthControls(); scheduleDiagramRender(); });
+    lwRow.appendChild(lwRange2); lwRow.appendChild(lwVal2); sec2.appendChild(lwRow); settingsPanel.appendChild(sec2);
+
+    var sec3 = document.createElement("div"); sec3.className = "modal-section"; sec3.innerHTML = '<span class="modal-section-title">다이어그램 표시 범위</span>';
+    var titleRow = document.createElement("label"); titleRow.className = "npToggle"; titleRow.style.marginBottom = "12px";
+    var titleChk = document.createElement("input"); titleChk.type = "checkbox"; titleChk.checked = state.omitRootTitle;
+    titleChk.addEventListener("change", function () { state.omitRootTitle = titleChk.checked; document.getElementById("exportOmitRootChk").checked = titleChk.checked; scheduleDiagramRender(); });
+    titleRow.appendChild(titleChk); titleRow.appendChild(document.createTextNode("최상위(1수준) 항목을 제목으로 보고 다이어그램에서 생략"));
+    sec3.appendChild(titleRow);
+    var lvlRow = document.createElement("div"); lvlRow.className = "level-row";
+    var lvlLabel = document.createElement("span"); lvlLabel.className = "lname"; lvlLabel.textContent = "표시 레벨"; lvlRow.appendChild(lvlLabel);
+    var lvlSelect = document.createElement("select"); lvlSelect.className = "npSelect";
+    var optAll = document.createElement("option"); optAll.value = ""; optAll.textContent = "전체 표시"; lvlSelect.appendChild(optAll);
+    var ml2 = maxLevel();
+    for (var lv = 1; lv <= ml2 + 1; lv++) { var opt = document.createElement("option"); opt.value = String(lv); opt.textContent = lv + "수준까지"; lvlSelect.appendChild(opt); }
+    lvlSelect.value = state.maxDisplayLevel == null ? "" : String(state.maxDisplayLevel);
+    lvlSelect.addEventListener("change", function () { state.maxDisplayLevel = lvlSelect.value === "" ? null : parseInt(lvlSelect.value, 10); scheduleDiagramRender(); });
+    lvlRow.appendChild(lvlSelect); sec3.appendChild(lvlRow);
+    var lvlHint = document.createElement("p"); lvlHint.className = "hint";
+    lvlHint.textContent = "여기서 정한 레벨보다 더 보여주거나 접고 싶은 가지는, 다이어그램에서 해당 항목 옆의 (+/−) 표시를 눌러 개별적으로 조정할 수 있습니다.";
+    sec3.appendChild(lvlHint); settingsPanel.appendChild(sec3);
+
+    var hint = document.createElement("p"); hint.className = "hint";
+    hint.textContent = "개별 항목의 색상 · 크기 · 메모 · 체크박스 · 마커 · 설명 박스는 다이어그램에서 항목을 직접 클릭해 편집하세요.";
+    settingsPanel.appendChild(hint);
+  }
+  var lineWidthRange = document.getElementById("lineWidthRange");
+  var lineWidthVal = document.getElementById("lineWidthVal");
+  function syncLineWidthControls() { lineWidthRange.value = state.lineWidth; lineWidthVal.textContent = state.lineWidth; }
+  lineWidthRange.addEventListener("input", function () { state.lineWidth = parseFloat(lineWidthRange.value); lineWidthVal.textContent = lineWidthRange.value; scheduleDiagramRender(); });
+
+  // ---------------------------------------------------------------------
+  // document persistence (editor ⇄ library)
+  // ---------------------------------------------------------------------
+  function loadDocIntoEditor(rec) {
+    state.items = deepClone(rec.items || []);
+    state.fontId = rec.fontId || "noto-sans";
+    state.levelSettings = deepClone(rec.levelSettings || {});
+    state.lineWidth = typeof rec.lineWidth === "number" ? rec.lineWidth : 1;
+    state.omitRootTitle = !!rec.omitRootTitle;
+    state.maxDisplayLevel = rec.maxDisplayLevel == null ? null : rec.maxDisplayLevel;
+    state.canvasMaxTextWidth = rec.canvasMaxTextWidth == null ? null : rec.canvasMaxTextWidth;
+    state.diagramMode = rec.diagramMode === "vertical" ? "vertical" : "tree";
+    state.currentDocId = rec.id;
+    state.currentDocTitle = rec.title || "";
+    state.selectedId = null;
+    state.zoomRootId = null;
+    state.multiSelectMode = false; state.selectedIds.clear();
+    document.getElementById("pasteBox").value = "";
+    syncCanvasWidthControls();
+    document.getElementById("pasteSection").classList.add("collapsed");
+  }
+  function currentDocPayload(title) {
+    return {
+      title: title, updatedAt: Date.now(), items: deepClone(state.items), fontId: state.fontId,
+      levelSettings: deepClone(state.levelSettings), lineWidth: state.lineWidth,
+      omitRootTitle: state.omitRootTitle, maxDisplayLevel: state.maxDisplayLevel, canvasMaxTextWidth: state.canvasMaxTextWidth,
+      diagramMode: state.diagramMode,
+    };
+  }
+  function saveCurrentDocument(silent) {
+    var titleInput = document.getElementById("docTitleInput");
+    var title = (titleInput.value || "").trim() || (state.items[0] && state.items[0].text) || "제목 없음";
+    var payload = currentDocPayload(title);
+    if (state.currentDocId && state.library.documents[state.currentDocId]) {
+      Object.assign(state.library.documents[state.currentDocId], payload);
+    } else {
+      var id = newDocId();
+      payload.id = id;
+      state.library.documents[id] = payload;
+      state.library.documentOrder.unshift(id);
+      state.currentDocId = id;
+    }
+    state.currentDocTitle = title;
+    saveLibrary();
+    if (!silent) flashSaveBtn();
+  }
+  function flashSaveBtn() {
+    var btn = document.getElementById("saveDocBtn");
+    var original = btn.innerHTML;
+    btn.innerHTML = "저장됨 ✓";
+    setTimeout(function () { btn.innerHTML = ICONS.save + "<span>저장</span>"; }, 1100);
+  }
+  function goToLibrary() {
+    var hasContent = state.items.length > 1 || (state.items[0] && state.items[0].text);
+    if (state.currentDocId) saveCurrentDocument(true);
+    else if (hasContent && window.confirm("저장하지 않은 새 문서입니다. 라이브러리에 저장할까요?")) saveCurrentDocument(true);
+    setView("library");
+    renderLibraryScreen();
+  }
+  function openDocument(id) {
+    var rec = state.library.documents[id];
+    if (!rec) return;
+    loadDocIntoEditor(rec);
+    setView("editor");
+    renderAll();
+    updateEditorTitleUI();
+    updateMultiSelectLabel(); renderSelectionBar(); updateDiagramModeLabel();
+    document.getElementById("exportOmitRootChk").checked = state.omitRootTitle;
+  }
+  function newDocument() {
+    state.items = [{ id: nextId(), text: "", level: 0 }];
+    state.fontId = "noto-sans"; state.levelSettings = {}; state.lineWidth = 1;
+    state.omitRootTitle = false; state.maxDisplayLevel = null; state.canvasMaxTextWidth = null;
+    state.diagramMode = "tree";
+    state.currentDocId = null; state.currentDocTitle = "";
+    state.zoomRootId = null;
+    state.multiSelectMode = false; state.selectedIds.clear();
+    document.getElementById("pasteBox").value = "";
+    syncCanvasWidthControls();
+    document.getElementById("pasteSection").classList.remove("collapsed");
+    setView("editor"); renderAll(); updateEditorTitleUI();
+    updateMultiSelectLabel(); renderSelectionBar(); updateDiagramModeLabel();
+    document.getElementById("exportOmitRootChk").checked = state.omitRootTitle;
+  }
+  function duplicateDocument(id) {
+    var rec = state.library.documents[id];
+    if (!rec) return;
+    var newId = newDocId();
+    var copy = deepClone(rec);
+    copy.id = newId; copy.title = (rec.title || "제목 없음") + " 사본"; copy.updatedAt = Date.now();
+    state.library.documents[newId] = copy;
+    state.library.documentOrder.unshift(newId);
+    saveLibrary(); renderLibraryScreen();
+  }
+  function deleteDocument(id) {
+    if (!window.confirm("이 문서를 삭제할까요? 되돌릴 수 없습니다.")) return;
+    delete state.library.documents[id];
+    state.library.documentOrder = state.library.documentOrder.filter(function (d) { return d !== id; });
+    Object.keys(state.library.notebooks).forEach(function (nid) {
+      var nb = state.library.notebooks[nid];
+      nb.docIds = nb.docIds.filter(function (d) { return d !== id; });
+    });
+    saveLibrary(); renderLibraryScreen();
+  }
+  function renameDocumentPrompt(id) {
+    var rec = state.library.documents[id]; if (!rec) return;
+    var t = window.prompt("새 문서 제목", rec.title || "");
+    if (t === null) return;
+    rec.title = t.trim() || "제목 없음"; rec.updatedAt = Date.now();
+    saveLibrary(); renderLibraryScreen();
+  }
+  function updateEditorTitleUI() { document.getElementById("docTitleInput").value = state.currentDocTitle || ""; }
+
+  // ---------------------------------------------------------------------
+  // backup / restore (individual document + whole library)
+  // ---------------------------------------------------------------------
+  function fmtDateForFile(ts) {
+    var d = new Date(ts);
+    function p(n) { return String(n).padStart(2, "0"); }
+    return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes());
+  }
+  function exportDocumentJSON(id) {
+    var doc = state.library.documents[id]; if (!doc) return;
+    var payload = Object.assign({ appFormat: "outline-tree-document", version: 1 }, deepClone(doc));
+    delete payload.id;
+    var name = (doc.title || "문서").replace(/[\\/:*?"<>|]/g, "_");
+    downloadBlob(JSON.stringify(payload, null, 2), "application/json", name + ".json");
+  }
+  function exportLibraryJSON() {
+    var payload = { appFormat: "outline-tree-library", version: 1, exportedAt: Date.now(), library: deepClone(state.library) };
+    downloadBlob(JSON.stringify(payload, null, 2), "application/json", "outline-tree-library-backup-" + fmtDateForFile(Date.now()) + ".json");
+  }
+  function handleDocImportFile(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var doc = JSON.parse(reader.result);
+        if (!doc || !Array.isArray(doc.items)) throw new Error("bad format");
+        var id = newDocId();
+        state.library.documents[id] = {
+          id: id, title: doc.title || "가져온 문서", updatedAt: Date.now(), items: deepClone(doc.items),
+          fontId: doc.fontId || "noto-sans", levelSettings: deepClone(doc.levelSettings || {}),
+          lineWidth: typeof doc.lineWidth === "number" ? doc.lineWidth : 1,
+          omitRootTitle: !!doc.omitRootTitle, maxDisplayLevel: doc.maxDisplayLevel == null ? null : doc.maxDisplayLevel,
+          canvasMaxTextWidth: doc.canvasMaxTextWidth == null ? null : doc.canvasMaxTextWidth,
+        };
+        state.library.documentOrder.unshift(id);
+        saveLibrary(); renderLibraryScreen();
+        alert('"' + (doc.title || "가져온 문서") + '" 문서를 라이브러리에 추가했습니다.');
+      } catch (e) { alert("문서를 가져오지 못했습니다. 올바른 백업(.json) 파일인지 확인해 주세요."); }
+    };
+    reader.readAsText(file);
+  }
+  function handleLibraryImportFile(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        var lib = data.library || data;
+        if (!lib || typeof lib.documents !== "object") throw new Error("bad format");
+        openImportChoiceModal(lib);
+      } catch (e) { alert("라이브러리 백업 파일을 읽지 못했습니다. 올바른 백업(.json) 파일인지 확인해 주세요."); }
+    };
+    reader.readAsText(file);
+  }
+  var importOverlay = document.getElementById("importOverlay");
+  var importPanel = document.getElementById("importPanel");
+  function openImportChoiceModal(lib) {
+    var docCount = Object.keys(lib.documents || {}).length;
+    var nbCount = Object.keys(lib.notebooks || {}).length;
+    importPanel.innerHTML = "";
+    var head = document.createElement("div"); head.className = "modal-head";
+    head.innerHTML = '<span class="eyebrow" style="color:var(--ink)">라이브러리 가져오기</span>';
+    var closeBtn = document.createElement("button"); closeBtn.className = "close-x"; closeBtn.innerHTML = ICONS.x;
+    closeBtn.addEventListener("click", function () { importOverlay.classList.remove("show"); });
+    head.appendChild(closeBtn); importPanel.appendChild(head);
+
+    var info = document.createElement("p"); info.className = "hint"; info.style.marginBottom = "16px";
+    info.textContent = "백업 파일에 문서 " + docCount + "개, 노트 " + nbCount + "개가 들어 있습니다. 가져올 방법을 선택하세요.";
+    importPanel.appendChild(info);
+
+    var mergeBtn = document.createElement("button");
+    mergeBtn.className = "primary-btn"; mergeBtn.style.width = "100%"; mergeBtn.style.justifyContent = "center";
+    mergeBtn.textContent = "현재 라이브러리에 병합(추가)";
+    mergeBtn.addEventListener("click", function () { mergeLibrary(lib); });
+    importPanel.appendChild(mergeBtn);
+
+    var mergeHint = document.createElement("p"); mergeHint.className = "hint"; mergeHint.style.margin = "6px 0 16px";
+    mergeHint.textContent = "기존 문서·노트는 그대로 두고, 백업 안의 항목들을 새 항목으로 추가합니다.";
+    importPanel.appendChild(mergeHint);
+
+    var replaceBtn = document.createElement("button");
+    replaceBtn.className = "npDangerBtn"; replaceBtn.textContent = "전체 교체(기존 라이브러리 삭제 후 덮어쓰기)";
+    replaceBtn.addEventListener("click", function () { replaceLibrary(lib); });
+    importPanel.appendChild(replaceBtn);
+    var replaceHint = document.createElement("p"); replaceHint.className = "hint"; replaceHint.style.margin = "6px 0 0";
+    replaceHint.textContent = "현재 저장된 모든 문서와 노트가 사라지고 백업 내용으로 완전히 바뀝니다. 되돌릴 수 없어요.";
+    importPanel.appendChild(replaceHint);
+
+    importOverlay.classList.add("show");
+  }
+  importOverlay.addEventListener("click", function (e) { if (e.target === importOverlay) importOverlay.classList.remove("show"); });
+
+  function mergeLibrary(lib) {
+    var idMap = {};
+    var docOrder = (lib.documentOrder && lib.documentOrder.length) ? lib.documentOrder : Object.keys(lib.documents || {});
+    docOrder.forEach(function (oldId) {
+      var doc = lib.documents[oldId]; if (!doc) return;
+      var newId = newDocId();
+      idMap[oldId] = newId;
+      var copy = deepClone(doc); copy.id = newId; copy.updatedAt = Date.now();
+      state.library.documents[newId] = copy;
+      state.library.documentOrder.unshift(newId);
+    });
+    var nbOrder = (lib.notebookOrder && lib.notebookOrder.length) ? lib.notebookOrder : Object.keys(lib.notebooks || {});
+    nbOrder.forEach(function (oldId) {
+      var nb = lib.notebooks[oldId]; if (!nb) return;
+      var newNb = newNbId();
+      var copy = deepClone(nb); copy.id = newNb; copy.updatedAt = Date.now();
+      copy.docIds = (nb.docIds || []).map(function (did) { return idMap[did] || did; }).filter(function (did) { return !!state.library.documents[did]; });
+      state.library.notebooks[newNb] = copy;
+      state.library.notebookOrder.unshift(newNb);
+    });
+    saveLibrary(); renderLibraryScreen();
+    importOverlay.classList.remove("show");
+    alert("라이브러리를 병합했습니다.");
+  }
+  function replaceLibrary(lib) {
+    if (!window.confirm("정말 전체 교체할까요? 현재 저장된 모든 문서와 노트가 삭제되고 백업 내용으로 바뀝니다. 되돌릴 수 없습니다.")) return;
+    state.library = {
+      documents: deepClone(lib.documents || {}), notebooks: deepClone(lib.notebooks || {}),
+      documentOrder: (lib.documentOrder || Object.keys(lib.documents || {})).slice(),
+      notebookOrder: (lib.notebookOrder || Object.keys(lib.notebooks || {})).slice(),
+    };
+    saveLibrary(); renderLibraryScreen();
+    importOverlay.classList.remove("show");
+    alert("라이브러리를 전체 교체했습니다.");
+  }
+
+
+  // ---------------------------------------------------------------------
+  // notebooks
+  // ---------------------------------------------------------------------
+  function newNotebookPrompt() {
+    var t = window.prompt("새 노트 제목", "새 노트");
+    if (t === null) return;
+    var id = newNbId();
+    state.library.notebooks[id] = { id: id, title: t.trim() || "새 노트", docIds: [], updatedAt: Date.now() };
+    state.library.notebookOrder.unshift(id);
+    saveLibrary(); renderLibraryScreen();
+    openNotebookEditModal(id);
+  }
+  function deleteNotebook(id) {
+    if (!window.confirm("이 노트를 삭제할까요? (안의 문서 자체는 삭제되지 않습니다)")) return;
+    delete state.library.notebooks[id];
+    state.library.notebookOrder = state.library.notebookOrder.filter(function (n) { return n !== id; });
+    saveLibrary(); renderLibraryScreen();
+  }
+
+  var notebookEditOverlay = document.getElementById("notebookEditOverlay");
+  var notebookEditPanel = document.getElementById("notebookEditPanel");
+  function openNotebookEditModal(id) {
+    renderNotebookEditModal(id);
+    notebookEditOverlay.classList.add("show");
+  }
+  function renderNotebookEditModal(id) {
+    var nb = state.library.notebooks[id];
+    if (!nb) return;
+    notebookEditPanel.innerHTML = "";
+    var head = document.createElement("div"); head.className = "modal-head";
+    head.innerHTML = '<span class="eyebrow" style="color:var(--ink)">노트 구성</span>';
+    var closeBtn = document.createElement("button"); closeBtn.className = "close-x"; closeBtn.innerHTML = ICONS.x;
+    closeBtn.addEventListener("click", function () { notebookEditOverlay.classList.remove("show"); renderLibraryScreen(); });
+    head.appendChild(closeBtn); notebookEditPanel.appendChild(head);
+
+    var titleInput = document.createElement("input");
+    titleInput.className = "npInput"; titleInput.style.marginBottom = "16px"; titleInput.value = nb.title;
+    titleInput.addEventListener("change", function () { nb.title = titleInput.value.trim() || "새 노트"; nb.updatedAt = Date.now(); saveLibrary(); });
+    notebookEditPanel.appendChild(titleInput);
+
+    var addSec = document.createElement("div"); addSec.className = "modal-section";
+    addSec.innerHTML = '<span class="modal-section-title">라이브러리에서 문서 추가</span>';
+    var addList = document.createElement("div"); addList.className = "addDocList";
+    if (state.library.documentOrder.length === 0) {
+      addList.innerHTML = '<p class="hint" style="margin:4px;">라이브러리에 문서가 없습니다.</p>';
+    } else {
+      state.library.documentOrder.forEach(function (docId) {
+        var doc = state.library.documents[docId]; if (!doc) return;
+        var row = document.createElement("div"); row.className = "addDocRow";
+        var label = document.createElement("label");
+        var chk = document.createElement("input"); chk.type = "checkbox"; chk.checked = nb.docIds.indexOf(docId) !== -1;
+        chk.addEventListener("change", function () {
+          if (chk.checked) { if (nb.docIds.indexOf(docId) === -1) nb.docIds.push(docId); }
+          else { nb.docIds = nb.docIds.filter(function (d) { return d !== docId; }); }
+          nb.updatedAt = Date.now(); saveLibrary(); renderTocList();
+        });
+        var span = document.createElement("span"); span.textContent = doc.title || "제목 없음";
+        label.appendChild(chk); label.appendChild(span); row.appendChild(label);
+        addList.appendChild(row);
+      });
+    }
+    addSec.appendChild(addList); notebookEditPanel.appendChild(addSec);
+
+    var tocSec = document.createElement("div"); tocSec.className = "modal-section";
+    tocSec.innerHTML = '<span class="modal-section-title">이 노트의 목차 (드래그로 순서 변경)</span>';
+    var tocList = document.createElement("div"); tocSec.appendChild(tocList); notebookEditPanel.appendChild(tocSec);
+
+    function renderTocList() {
+      if (nb.docIds.length === 0) { tocList.innerHTML = '<p class="hint" style="margin:4px;">아직 추가된 문서가 없습니다.</p>'; return; }
+      makeDraggableList(tocList, nb.docIds, function (docId) { var d = state.library.documents[docId]; return d ? (d.title || "제목 없음") : "(삭제된 문서)"; }, function (newOrder) {
+        nb.docIds = newOrder; nb.updatedAt = Date.now(); saveLibrary(); renderTocList();
+      }, function (docId) {
+        nb.docIds = nb.docIds.filter(function (d) { return d !== docId; });
+        nb.updatedAt = Date.now(); saveLibrary(); renderTocList(); renderNotebookEditModal(id);
+      });
+    }
+    renderTocList();
+  }
+  notebookEditOverlay.addEventListener("click", function (e) { if (e.target === notebookEditOverlay) { notebookEditOverlay.classList.remove("show"); renderLibraryScreen(); } });
+
+  // generic drag-drop reorder list
+  function makeDraggableList(container, ids, labelFn, onReorder, onRemove) {
+    container.innerHTML = "";
+    var dragIndex = null;
+    ids.forEach(function (id, i) {
+      var row = document.createElement("div");
+      row.className = "dragRow"; row.draggable = true;
+      var handle = document.createElement("span"); handle.className = "dragHandle"; handle.innerHTML = ICONS.grip;
+      var label = document.createElement("span"); label.className = "dragLabel"; label.textContent = (i + 1) + ". " + labelFn(id, i);
+      row.appendChild(handle); row.appendChild(label);
+      if (onRemove) {
+        var rm = document.createElement("button"); rm.className = "icbtn danger"; rm.innerHTML = ICONS.x; rm.title = "제거";
+        rm.addEventListener("click", function () { onRemove(id); });
+        row.appendChild(rm);
+      }
+      row.addEventListener("dragstart", function (e) { dragIndex = i; row.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; });
+      row.addEventListener("dragend", function () { row.classList.remove("dragging"); });
+      row.addEventListener("dragover", function (e) { e.preventDefault(); });
+      row.addEventListener("drop", function (e) {
+        e.preventDefault();
+        if (dragIndex === null || dragIndex === i) return;
+        var newIds = ids.slice();
+        var moved = newIds.splice(dragIndex, 1)[0];
+        newIds.splice(i, 0, moved);
+        onReorder(newIds);
+      });
+      container.appendChild(row);
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // notebook viewer (swipeable pages + TOC drawer)
+  // ---------------------------------------------------------------------
+  var nbTocOverlay = document.getElementById("nbTocOverlay");
+  var nbTocPanel = document.getElementById("nbTocPanel");
+  var nbPagesEl = document.getElementById("nbPages");
+
+  function openNotebookViewer(id) {
+    var nb = state.library.notebooks[id];
+    if (!nb) return;
+    state.notebookViewer = { notebookId: id };
+    setView("notebook");
+    document.getElementById("nbTitle").textContent = nb.title || "노트";
+    buildNotebookPages();
+  }
+  function buildNotebookPages() {
+    var nb = state.library.notebooks[state.notebookViewer.notebookId];
+    nbPagesEl.innerHTML = "";
+    var empty = document.getElementById("nbEmpty");
+    if (!nb || nb.docIds.length === 0) {
+      empty.style.display = "flex"; nbPagesEl.style.display = "none";
+      document.getElementById("nbPageIndicator").textContent = "0 / 0";
+      return;
+    }
+    empty.style.display = "none"; nbPagesEl.style.display = "flex";
+    nb.docIds.forEach(function (docId) {
+      var doc = state.library.documents[docId];
+      var page = document.createElement("div"); page.className = "nbPage";
+      if (!doc) { page.innerHTML = '<div class="nbMissing">삭제된 문서입니다</div>'; nbPagesEl.appendChild(page); return; }
+      var titleTag = document.createElement("div"); titleTag.className = "nbPageTitle"; titleTag.textContent = doc.title || "제목 없음";
+      var svg = document.createElementNS(SVGNS, "svg");
+      page.appendChild(svg); page.appendChild(titleTag);
+      nbPagesEl.appendChild(page);
+      renderReadonlySvgFor(doc, svg);
+    });
+    document.getElementById("nbPageIndicator").textContent = "1 / " + nb.docIds.length;
+    nbPagesEl.scrollLeft = 0;
+  }
+  nbPagesEl.addEventListener("scroll", function () {
+    var nb = state.library.notebooks[state.notebookViewer.notebookId];
+    if (!nb || nb.docIds.length === 0) return;
+    var pageW = nbPagesEl.clientWidth || 1;
+    var idx = Math.round(nbPagesEl.scrollLeft / pageW);
+    idx = Math.max(0, Math.min(nb.docIds.length - 1, idx));
+    document.getElementById("nbPageIndicator").textContent = (idx + 1) + " / " + nb.docIds.length;
+  });
+  function nbNavigate(dir) {
+    var nb = state.library.notebooks[state.notebookViewer.notebookId];
+    if (!nb || nb.docIds.length === 0) return;
+    var pageW = nbPagesEl.clientWidth || 1;
+    var idx = Math.round(nbPagesEl.scrollLeft / pageW) + dir;
+    idx = Math.max(0, Math.min(nb.docIds.length - 1, idx));
+    nbPagesEl.scrollTo({ left: idx * pageW, behavior: "smooth" });
+  }
+  document.getElementById("nbPrev").addEventListener("click", function () { nbNavigate(-1); });
+  document.getElementById("nbNext").addEventListener("click", function () { nbNavigate(1); });
+  document.getElementById("nbPrev").innerHTML = ICONS.chevL;
+  document.getElementById("nbNext").innerHTML = ICONS.chevR;
+  document.getElementById("nbBackBtn").innerHTML = ICONS.back;
+  document.getElementById("nbBackBtn").addEventListener("click", function () { setView("library"); renderLibraryScreen(); });
+  document.getElementById("nbTocBtn").innerHTML = ICONS.list + "<span>목차</span>";
+  document.getElementById("nbTocBtn").addEventListener("click", function () {
+    renderNbTocPanel();
+    nbTocOverlay.classList.add("show");
+  });
+  nbTocOverlay.addEventListener("click", function (e) { if (e.target === nbTocOverlay) nbTocOverlay.classList.remove("show"); });
+  function renderNbTocPanel() {
+    var nb = state.library.notebooks[state.notebookViewer.notebookId];
+    nbTocPanel.innerHTML = "";
+    var head = document.createElement("div"); head.className = "modal-head"; head.innerHTML = '<span class="eyebrow" style="color:var(--ink)">목차</span>';
+    var closeBtn = document.createElement("button"); closeBtn.className = "close-x"; closeBtn.innerHTML = ICONS.x;
+    closeBtn.addEventListener("click", function () { nbTocOverlay.classList.remove("show"); });
+    head.appendChild(closeBtn); nbTocPanel.appendChild(head);
+    if (!nb || nb.docIds.length === 0) { nbTocPanel.appendChild(Object.assign(document.createElement("p"), { className: "hint", textContent: "문서가 없습니다." })); return; }
+    var list = document.createElement("div"); nbTocPanel.appendChild(list);
+    nb.docIds.forEach(function (docId, i) {
+      var d = state.library.documents[docId];
+      var row = document.createElement("div"); row.className = "dragRow"; row.draggable = true;
+      row.innerHTML = '<span class="dragHandle">' + ICONS.grip + '</span><span class="dragLabel"></span>';
+      row.querySelector(".dragLabel").textContent = (i + 1) + ". " + (d ? (d.title || "제목 없음") : "(삭제된 문서)");
+      var goBtn = document.createElement("button"); goBtn.className = "tbtn"; goBtn.style.padding = "4px 9px"; goBtn.style.fontSize = "11px"; goBtn.textContent = "이동";
+      goBtn.addEventListener("click", function () { nbPagesEl.scrollTo({ left: i * nbPagesEl.clientWidth, behavior: "smooth" }); nbTocOverlay.classList.remove("show"); });
+      row.appendChild(goBtn);
+      list.appendChild(row);
+    });
+    var dragIndex = null;
+    Array.from(list.children).forEach(function (row, i) {
+      row.addEventListener("dragstart", function () { dragIndex = i; row.classList.add("dragging"); });
+      row.addEventListener("dragend", function () { row.classList.remove("dragging"); });
+      row.addEventListener("dragover", function (e) { e.preventDefault(); });
+      row.addEventListener("drop", function (e) {
+        e.preventDefault();
+        if (dragIndex === null || dragIndex === i) return;
+        var newIds = nb.docIds.slice();
+        var moved = newIds.splice(dragIndex, 1)[0];
+        newIds.splice(i, 0, moved);
+        nb.docIds = newIds; nb.updatedAt = Date.now(); saveLibrary();
+        renderNbTocPanel(); buildNotebookPages();
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // library screen
+  // ---------------------------------------------------------------------
+  document.getElementById("libBackupBtn").innerHTML = ICONS.download + "<span>전체 백업</span>";
+  document.getElementById("libBackupBtn").addEventListener("click", exportLibraryJSON);
+  document.getElementById("libImportBtn").innerHTML = ICONS.upload + "<span>가져오기</span>";
+  document.getElementById("libImportBtn").addEventListener("click", function () { document.getElementById("libraryImportFile").click(); });
+  document.getElementById("libraryImportFile").addEventListener("change", function (e) {
+    var f = e.target.files[0]; if (f) handleLibraryImportFile(f); e.target.value = "";
+  });
+  document.getElementById("docImportFile").addEventListener("change", function (e) {
+    var f = e.target.files[0]; if (f) handleDocImportFile(f); e.target.value = "";
+  });
+
+  var libTabsEl = document.getElementById("libTabs");
+  libTabsEl.querySelectorAll("button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      state.libTab = btn.getAttribute("data-tab");
+      libTabsEl.querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", b === btn); });
+      renderLibraryScreen();
+    });
+  });
+  function renderLibraryScreen() {
+    var body = document.getElementById("libBody");
+    body.innerHTML = "";
+    if (state.libTab === "docs") {
+      var addRow = document.createElement("div"); addRow.style.display = "flex"; addRow.style.gap = "8px"; addRow.style.marginBottom = "14px"; addRow.style.flexWrap = "wrap";
+      var addBtn = document.createElement("button"); addBtn.id = "addDocBtn"; addBtn.className = "primary-btn"; addBtn.style.marginBottom = "0"; addBtn.textContent = "+ 새 문서";
+      addBtn.addEventListener("click", newDocument);
+      var importDocBtn = document.createElement("button"); importDocBtn.className = "tbtn"; importDocBtn.textContent = "문서 가져오기";
+      importDocBtn.addEventListener("click", function () { document.getElementById("docImportFile").click(); });
+      addRow.appendChild(addBtn); addRow.appendChild(importDocBtn);
+      body.appendChild(addRow);
+      if (state.library.documentOrder.length === 0) {
+        var empty = document.createElement("div"); empty.className = "libEmpty";
+        empty.innerHTML = "아직 저장된 문서가 없습니다.<br>새 문서를 만들어 아웃라인을 붙여넣어 보세요.";
+        body.appendChild(empty);
+        return;
+      }
+      var grid = document.createElement("div"); grid.className = "libGrid";
+      state.library.documentOrder.forEach(function (id) {
+        var doc = state.library.documents[id]; if (!doc) return;
+        var card = document.createElement("div"); card.className = "libCard";
+        var title = document.createElement("div"); title.className = "libCardTitle"; title.textContent = doc.title || "제목 없음";
+        title.addEventListener("click", function () { openDocument(id); });
+        var meta = document.createElement("div"); meta.className = "libCardMeta";
+        meta.textContent = (doc.items ? doc.items.length : 0) + "개 항목 · " + fmtDate(doc.updatedAt || Date.now());
+        var btns = document.createElement("div"); btns.className = "libCardBtns";
+        btns.appendChild(mkTbtn("열기", function () { openDocument(id); }));
+        btns.appendChild(mkTbtn("이름변경", function () { renameDocumentPrompt(id); }));
+        btns.appendChild(mkTbtn("복제", function () { duplicateDocument(id); }));
+        btns.appendChild(mkTbtn("백업", function () { exportDocumentJSON(id); }));
+        btns.appendChild(mkTbtn("삭제", function () { deleteDocument(id); }, true));
+        card.appendChild(title); card.appendChild(meta); card.appendChild(btns);
+        grid.appendChild(card);
+      });
+      body.appendChild(grid);
+    } else {
+      var addNoteBtn = document.createElement("button"); addNoteBtn.id = "addNoteBtn"; addNoteBtn.className = "primary-btn"; addNoteBtn.textContent = "+ 새 노트";
+      addNoteBtn.addEventListener("click", newNotebookPrompt);
+      body.appendChild(addNoteBtn);
+      if (state.library.notebookOrder.length === 0) {
+        var empty2 = document.createElement("div"); empty2.className = "libEmpty";
+        empty2.innerHTML = "노트는 여러 다이어그램 문서를 순서대로 묶어 옆으로 넘기며 볼 수 있는 모음입니다.<br>새 노트를 만들어 문서를 추가해 보세요.";
+        body.appendChild(empty2);
+        return;
+      }
+      var grid2 = document.createElement("div"); grid2.className = "libGrid";
+      state.library.notebookOrder.forEach(function (id) {
+        var nb = state.library.notebooks[id]; if (!nb) return;
+        var card = document.createElement("div"); card.className = "libCard";
+        var title = document.createElement("div"); title.className = "libCardTitle"; title.textContent = nb.title || "새 노트";
+        title.addEventListener("click", function () { openNotebookViewer(id); });
+        var meta = document.createElement("div"); meta.className = "libCardMeta";
+        meta.textContent = nb.docIds.length + "개 문서 · " + fmtDate(nb.updatedAt || Date.now());
+        var btns = document.createElement("div"); btns.className = "libCardBtns";
+        btns.appendChild(mkTbtn("보기", function () { openNotebookViewer(id); }));
+        btns.appendChild(mkTbtn("구성", function () { openNotebookEditModal(id); }));
+        btns.appendChild(mkTbtn("삭제", function () { deleteNotebook(id); }, true));
+        card.appendChild(title); card.appendChild(meta); card.appendChild(btns);
+        grid2.appendChild(card);
+      });
+      body.appendChild(grid2);
+    }
+  }
+  function mkTbtn(label, fn, danger) {
+    var b = document.createElement("button"); b.className = "tbtn"; b.textContent = label;
+    if (danger) b.style.color = "var(--danger)";
+    b.addEventListener("click", fn);
+    return b;
+  }
+
+  // ---------------------------------------------------------------------
+  // view switching
+  // ---------------------------------------------------------------------
+  function setView(view) {
+    state.view = view;
+    ["screenLibrary", "screenEditor", "screenNotebook"].forEach(function (sid) {
+      document.getElementById(sid).classList.toggle("active", (sid === "screenLibrary" && view === "library") || (sid === "screenEditor" && view === "editor") || (sid === "screenNotebook" && view === "notebook"));
+    });
+    renderMobileBarVisibility();
+  }
+
+  // ---------------------------------------------------------------------
+  // editor toolbar wiring
+  // ---------------------------------------------------------------------
+  var fontSelect = document.getElementById("fontSelect");
+  FONTS.forEach(function (f) { var opt = document.createElement("option"); opt.value = f.id; opt.textContent = f.label; fontSelect.appendChild(opt); });
+  fontSelect.addEventListener("change", function () {
+    state.fontId = fontSelect.value;
+    document.documentElement.style.setProperty("--doc-font", currentFont().css);
+    if (document.fonts && document.fonts.load) {
+      Promise.all([document.fonts.load("400 20px " + currentFont().css), document.fonts.load("700 20px " + currentFont().css)]).then(renderSVG).catch(renderSVG);
+    } else { renderSVG(); }
+  });
+
+  var sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
+  var mainEl = document.getElementById("main");
+  var sidebarCollapsed = false;
+  function updateSidebarToggleLabel() { sidebarToggleBtn.innerHTML = ICONS.sidebar + "<span>" + (sidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기") + "</span>"; sidebarToggleBtn.classList.toggle("active", sidebarCollapsed); }
+  updateSidebarToggleLabel();
+  sidebarToggleBtn.addEventListener("click", function () {
+    sidebarCollapsed = !sidebarCollapsed;
+    mainEl.classList.toggle("sidebar-collapsed", sidebarCollapsed);
+    updateSidebarToggleLabel();
+  });
+
+  var mobileToggleBtn = document.getElementById("mobileToggle");
+  function updateMobileToggleLabel() {
+    mobileToggleBtn.innerHTML = (state.mobileMode ? ICONS.smartphone : ICONS.monitor) + "<span>" + (state.mobileMode ? "모바일" : "데스크톱") + "</span>";
+    mobileToggleBtn.classList.toggle("active", state.mobileMode);
+  }
+  mobileToggleBtn.addEventListener("click", function () { state.mobileMode = !state.mobileMode; applyMobileMode(); });
+
+  var diagramModeBtn = document.getElementById("diagramModeToggle");
+  function updateDiagramModeLabel() {
+    diagramModeBtn.textContent = state.diagramMode === "vertical" ? "↓ 세로형" : "→ 가로형";
+    diagramModeBtn.classList.toggle("active", state.diagramMode === "vertical");
+  }
+  diagramModeBtn.addEventListener("click", function () {
+    state.diagramMode = state.diagramMode === "vertical" ? "tree" : "vertical";
+    updateDiagramModeLabel();
+    scheduleDiagramRender();
+  });
+  updateDiagramModeLabel();
+  function applyMobileMode() { document.body.classList.toggle("mobile-mode", state.mobileMode); updateMobileToggleLabel(); renderMobileBarVisibility(); }
+
+  var mobileTabsEl = document.getElementById("mobileTabs");
+  mobileTabsEl.querySelectorAll("button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      state.mobileTab = btn.getAttribute("data-tab");
+      mobileTabsEl.querySelectorAll("button").forEach(function (b) { b.classList.toggle("active", b === btn); });
+      document.body.classList.toggle("tab-edit", state.mobileTab === "edit");
+      document.body.classList.toggle("tab-preview", state.mobileTab === "preview");
+    });
+  });
+
+  document.getElementById("settingsBtn").innerHTML = ICONS.settings + "<span>설정</span>";
+  document.getElementById("settingsBtn").addEventListener("click", function () { renderSettingsPanel(); overlay.classList.add("show"); });
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.classList.remove("show"); });
+
+  document.getElementById("importBtn").innerHTML = ICONS.upload + "<span>다이어그램으로 변환</span>";
+  document.getElementById("importBtn").addEventListener("click", importFromPaste);
+
+  var pasteSection = document.getElementById("pasteSection");
+  document.getElementById("pasteToggle").addEventListener("click", function () { pasteSection.classList.toggle("collapsed"); });
+
+  var multiSelectBtn = document.getElementById("multiSelectToggle");
+  function updateMultiSelectLabel() { multiSelectBtn.textContent = state.multiSelectMode ? "다중 선택 끄기" : "다중 선택"; multiSelectBtn.classList.toggle("active", state.multiSelectMode); }
+  updateMultiSelectLabel();
+  multiSelectBtn.addEventListener("click", function () {
+    state.multiSelectMode = !state.multiSelectMode;
+    if (!state.multiSelectMode) state.selectedIds.clear();
+    updateMultiSelectLabel(); renderList(); renderSVG(); renderSelectionBar();
+  });
+
+  var canvasWidthRange = document.getElementById("canvasWidthRange");
+  var canvasWidthVal = document.getElementById("canvasWidthVal");
+  function syncCanvasWidthControls() {
+    var v = state.canvasMaxTextWidth || 0;
+    canvasWidthRange.value = v;
+    canvasWidthVal.textContent = v ? (v + "px") : "무제한";
+  }
+  canvasWidthRange.addEventListener("input", function () {
+    var v = parseInt(canvasWidthRange.value, 10);
+    state.canvasMaxTextWidth = v > 0 ? Math.max(80, v) : null;
+    canvasWidthVal.textContent = v > 0 ? (Math.max(80, v) + "px") : "무제한";
+    scheduleDiagramRender();
+  });
+
+  document.getElementById("addRootBtn").addEventListener("click", function () {
+    var newItem = { id: nextId(), text: "", level: 0 };
+    state.items.push(newItem); pendingFocusId = newItem.id; renderList(); scheduleDiagramRender();
+  });
+  document.getElementById("demoBtn").addEventListener("click", function () {
+    document.getElementById("pasteBox").value = demoText();
+    state.items = parseOutlineText(demoText()); state.selectedId = null; state.zoomRootId = null; renderAll();
+  });
+  document.getElementById("clearBtn").addEventListener("click", function () {
+    document.getElementById("pasteBox").value = "";
+    state.items = [{ id: nextId(), text: "", level: 0 }]; state.selectedId = null; state.zoomRootId = null; renderAll();
+  });
+
+  document.getElementById("zoomIn").addEventListener("click", function () { state.zoom = Math.min(3, state.zoom + 0.15); applyZoom(); });
+  document.getElementById("zoomOut").addEventListener("click", function () { state.zoom = Math.max(0.25, state.zoom - 0.15); applyZoom(); });
+  document.getElementById("zoomReset").innerHTML = ICONS.maximize;
+  document.getElementById("zoomReset").addEventListener("click", function () { state.zoom = 1; applyZoom(); });
+  document.getElementById("exportOutlineCopyBtn").addEventListener("click", copyOutlineText);
+  document.getElementById("exportOutlineBtn").addEventListener("click", exportOutlineText);
+  document.getElementById("exportSvgBtn").addEventListener("click", exportSVG);
+  document.getElementById("exportPngBtn").innerHTML = ICONS.download + "<span>PNG 내보내기</span>";
+  document.getElementById("exportPngBtn").addEventListener("click", exportPNG);
+
+  document.getElementById("backToLibBtn").innerHTML = ICONS.back;
+  document.getElementById("backToLibBtn").addEventListener("click", goToLibrary);
+  document.getElementById("saveDocBtn").innerHTML = ICONS.save + "<span>저장</span>";
+  document.getElementById("saveDocBtn").addEventListener("click", function () { saveCurrentDocument(false); });
+  document.getElementById("docTitleInput").addEventListener("change", function () { state.currentDocTitle = document.getElementById("docTitleInput").value; saveCurrentDocument(true); });
+
+  window.addEventListener("resize", function () { if (window.innerWidth < 640 && !state.mobileMode) { state.mobileMode = true; applyMobileMode(); } });
+
+  // ---------------------------------------------------------------------
+  // orchestration + init
+  // ---------------------------------------------------------------------
+  function renderAll() { renderList(); renderSVG(); }
+
+  buildMobileBar();
+  applyMobileMode();
+  document.body.classList.add("tab-edit");
+  document.documentElement.style.setProperty("--doc-font", currentFont().css);
+  syncLineWidthControls();
+  syncCanvasWidthControls();
+
+  if (state.library.documentOrder.length === 0) {
+    var seedItems = parseOutlineText(demoText());
+    var seedId = newDocId();
+    state.library.documents[seedId] = { id: seedId, title: "예시 문서", updatedAt: Date.now(), items: seedItems, fontId: "noto-sans", levelSettings: {}, lineWidth: 1, omitRootTitle: false, maxDisplayLevel: null };
+    state.library.documentOrder.unshift(seedId);
+    saveLibrary();
+  }
+  setView("library");
+  renderLibraryScreen();
+
+  if (document.fonts && document.fonts.ready) { document.fonts.ready.catch(function () {}); }
+})();
+</script>
+</body>
+</html>
