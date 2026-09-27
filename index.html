@@ -16,6 +16,7 @@
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 <style>
   :root {
     --ink: #111111; --paper: #FFFFFF;
@@ -45,6 +46,19 @@
   .eyebrow { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px; letter-spacing: .14em; color: var(--gray-500); text-transform: uppercase; }
   .eyebrow-sm { font-family: ui-monospace, monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--gray-500); }
 
+  /* 키보드 포커스 표시 (접근성) */
+  .tbtn:focus-visible, .primary-btn:focus-visible, .linklike:focus-visible, .icbtn:focus-visible,
+  button:focus-visible, .zoomctl button:focus-visible, .npSecondaryBtn:focus-visible, .npResetBtn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 6px; }
+
+  /* 관련 버튼들을 시각적으로 묶어주는 그룹 구분선/칩 */
+  .tgroup { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .tbar-divider { width: 1px; align-self: stretch; min-height: 18px; background: var(--gray-200); flex-shrink: 0; }
+  @media (max-width: 640px) { .tbar-divider { display: none; } }
+  #exportBar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .exportGroup { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 9px; padding: 5px 8px; }
+  .exportOmitLabel { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--gray-700); cursor: pointer; white-space: nowrap; }
+  .exportOmitLabel input { accent-color: var(--ink); }
+
   /* ================= LIBRARY SCREEN ================= */
   #libHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--gray-200); flex-wrap: wrap; }
   .libTitleRow { display: flex; align-items: baseline; gap: 9px; }
@@ -56,7 +70,8 @@
   .libGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .libEmpty { text-align: center; color: var(--gray-500); font-size: 13px; padding: 60px 20px; line-height: 1.8; }
   .libEmpty .primary-btn { margin: 6px; }
-  .libCard { background: var(--paper); border: 1px solid var(--gray-200); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .libCard { background: var(--paper); border: 1px solid var(--gray-200); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 8px; transition: box-shadow .12s, border-color .12s; }
+  .libCard:hover { border-color: var(--gray-300); box-shadow: 0 2px 10px rgba(0,0,0,.06); }
   .libCardTitle { font-size: 14px; font-weight: 700; word-break: break-word; cursor: pointer; }
   .libCardTitle:hover { text-decoration: underline; }
   .libCardMeta { font-size: 11px; color: var(--gray-500); font-family: ui-monospace, monospace; }
@@ -341,12 +356,17 @@
         <input id="docTitleInput" type="text" placeholder="제목 없음" />
       </div>
       <div class="toolbar-right">
-        <button id="saveDocBtn" class="primary-btn"></button>
-        <select id="fontSelect" class="tbtn" title="글꼴 선택"></select>
-        <button id="diagramModeToggle" class="tbtn" title="다이어그램 구조: 가로로 넓어지는 트리 ↔ 세로로 들여쓰는 아웃라인"></button>
-        <button id="mobileToggle" class="tbtn" title="모바일 최적화 모드 전환"></button>
-        <button id="sidebarToggleBtn" class="tbtn" title="아웃라인 사이드바 접기/펼치기"></button>
-        <button id="settingsBtn" class="tbtn" title="폰트 크기 · 굵기 · 연결선 굵기 · 표시 범위"></button>
+        <div class="tgroup">
+          <button id="saveDocBtn" class="primary-btn"></button>
+          <select id="fontSelect" class="tbtn" title="글꼴 선택"></select>
+        </div>
+        <span class="tbar-divider"></span>
+        <div class="tgroup">
+          <button id="diagramModeToggle" class="tbtn" title="다이어그램 구조: 가로로 넓어지는 트리 ↔ 세로로 들여쓰는 아웃라인"></button>
+          <button id="mobileToggle" class="tbtn" title="모바일 최적화 모드 전환"></button>
+          <button id="sidebarToggleBtn" class="tbtn" title="아웃라인 사이드바 접기/펼치기"></button>
+          <button id="settingsBtn" class="tbtn" title="폰트 크기 · 굵기 · 연결선 굵기 · 표시 범위"></button>
+        </div>
       </div>
     </div>
 
@@ -409,19 +429,25 @@
             <input type="range" id="canvasWidthRange" min="0" max="500" step="10" value="0">
             <span class="lwval" id="canvasWidthVal">무제한</span>
           </div>
-          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-            <select id="outlineExportFormat" class="tbtn" title="내보낼 텍스트 형식">
-              <option value="bullets">불렛 마크다운</option>
-              <option value="md-headers">마크다운 헤더(#)</option>
-              <option value="indent">들여쓰기 텍스트</option>
-            </select>
-            <label style="display:flex; align-items:center; gap:5px; font-size:12px; color:var(--gray-600); cursor:pointer;" title="맨 위(최상위) 항목은 제외하고 하위 항목부터 내보내기">
-              <input type="checkbox" id="exportOmitRootChk" style="accent-color:var(--ink);">최상위 제외
-            </label>
-            <button id="exportOutlineCopyBtn" class="tbtn" title="클립보드로 복사">복사</button>
-            <button id="exportOutlineBtn" class="tbtn" title="현재 아웃라인을 텍스트 파일로 내보내기">파일로</button>
-            <button id="exportSvgBtn" class="tbtn">SVG</button>
-            <button id="exportPngBtn" class="primary-btn"></button>
+          <div id="exportBar">
+            <div class="exportGroup" title="아웃라인을 텍스트로 내보내기">
+              <select id="outlineExportFormat" class="tbtn" title="내보낼 텍스트 형식">
+                <option value="bullets">불렛 마크다운</option>
+                <option value="md-headers">마크다운 헤더(#)</option>
+                <option value="indent">들여쓰기 텍스트</option>
+              </select>
+              <label class="exportOmitLabel" title="맨 위(최상위) 항목은 제외하고 하위 항목부터 내보내기">
+                <input type="checkbox" id="exportOmitRootChk">최상위 제외
+              </label>
+              <button id="exportOutlineCopyBtn" class="tbtn" title="클립보드로 복사">복사</button>
+              <button id="exportOutlineBtn" class="tbtn" title="현재 아웃라인을 텍스트 파일로 내보내기">파일로</button>
+            </div>
+            <span class="tbar-divider"></span>
+            <div class="exportGroup" title="다이어그램을 이미지·문서로 내보내기">
+              <button id="exportSvgBtn" class="tbtn" title="벡터(SVG) 파일로 내보내기">SVG</button>
+              <button id="exportPdfBtn" class="tbtn" title="A4 용지 크기에 맞춰 PDF로 내보내기">PDF</button>
+              <button id="exportPngBtn" class="primary-btn"></button>
+            </div>
           </div>
         </div>
       </div>
@@ -2132,12 +2158,16 @@
     copyBranchBtn.style.display = "flex"; copyBranchBtn.style.alignItems = "center"; copyBranchBtn.style.justifyContent = "center";
     copyBranchBtn.addEventListener("click", function () { copyBranchToLibrary(id); });
     branchSec.appendChild(copyBranchBtn);
-    var exportBranchRow = document.createElement("div"); exportBranchRow.style.display = "flex"; exportBranchRow.style.gap = "8px"; exportBranchRow.style.marginTop = "8px";
-    var exportBranchSvg = document.createElement("button"); exportBranchSvg.className = "npSecondaryBtn"; exportBranchSvg.style.marginTop = "0"; exportBranchSvg.textContent = "이 가지만 SVG로 내보내기";
+    var branchExportLabel = document.createElement("div"); branchExportLabel.className = "hint"; branchExportLabel.style.marginTop = "10px"; branchExportLabel.style.marginBottom = "2px"; branchExportLabel.textContent = "이 가지만 내보내기";
+    branchSec.appendChild(branchExportLabel);
+    var exportBranchRow = document.createElement("div"); exportBranchRow.style.display = "flex"; exportBranchRow.style.gap = "8px"; exportBranchRow.style.marginTop = "4px"; exportBranchRow.style.flexWrap = "wrap";
+    var exportBranchSvg = document.createElement("button"); exportBranchSvg.className = "npSecondaryBtn"; exportBranchSvg.style.marginTop = "0"; exportBranchSvg.style.flex = "1 1 90px"; exportBranchSvg.textContent = "SVG로"; exportBranchSvg.title = "이 가지만 SVG로 내보내기";
     exportBranchSvg.addEventListener("click", function () { exportBranch(id, "svg"); });
-    var exportBranchPng = document.createElement("button"); exportBranchPng.className = "npSecondaryBtn"; exportBranchPng.style.marginTop = "0"; exportBranchPng.textContent = "이 가지만 PNG로 내보내기";
+    var exportBranchPdf = document.createElement("button"); exportBranchPdf.className = "npSecondaryBtn"; exportBranchPdf.style.marginTop = "0"; exportBranchPdf.style.flex = "1 1 90px"; exportBranchPdf.textContent = "PDF로"; exportBranchPdf.title = "이 가지만 A4 PDF로 내보내기";
+    exportBranchPdf.addEventListener("click", function () { exportBranch(id, "pdf"); });
+    var exportBranchPng = document.createElement("button"); exportBranchPng.className = "npSecondaryBtn"; exportBranchPng.style.marginTop = "0"; exportBranchPng.style.flex = "1 1 90px"; exportBranchPng.textContent = "PNG로"; exportBranchPng.title = "이 가지만 PNG로 내보내기";
     exportBranchPng.addEventListener("click", function () { exportBranch(id, "png"); });
-    exportBranchRow.appendChild(exportBranchSvg); exportBranchRow.appendChild(exportBranchPng);
+    exportBranchRow.appendChild(exportBranchSvg); exportBranchRow.appendChild(exportBranchPdf); exportBranchRow.appendChild(exportBranchPng);
     branchSec.appendChild(exportBranchRow);
     nodePanel.appendChild(branchSec);
   }
@@ -2327,7 +2357,8 @@
     var a = document.createElement("a"); a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
   }
-  function svgToPng(fromEl, filename, onDone) {
+  // SVG를 래스터화된 캔버스로 변환하는 공용 헬퍼 (PNG/PDF 내보내기가 공유)
+  function svgToCanvas(fromEl, onDone) {
     var w = parseFloat(fromEl.getAttribute("width")), h = parseFloat(fromEl.getAttribute("height"));
     var blob = new Blob([serializeSvg(fromEl)], { type: "image/svg+xml;charset=utf-8" });
     var url = URL.createObjectURL(blob);
@@ -2340,11 +2371,36 @@
       ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.scale(scale, scale); ctx.drawImage(img, 0, 0);
       URL.revokeObjectURL(url);
+      onDone(canvas, w, h);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); onDone(null); };
+    img.src = url;
+  }
+  function svgToPng(fromEl, filename, onDone) {
+    svgToCanvas(fromEl, function (canvas) {
+      if (!canvas) { alert("PNG 내보내기에 실패했습니다. 다시 시도해 주세요."); if (onDone) onDone(); return; }
       var a = document.createElement("a"); a.href = canvas.toDataURL("image/png"); a.download = filename; a.click();
       if (onDone) onDone();
-    };
-    img.onerror = function () { URL.revokeObjectURL(url); alert("PNG 내보내기에 실패했습니다. 다시 시도해 주세요."); if (onDone) onDone(); };
-    img.src = url;
+    });
+  }
+  // SVG를 A4 용지에 맞춰 PDF로 내보내기 (가로세로 비율에 따라 자동으로 세로/가로 방향 선택, 여백 10mm)
+  function svgToPdfA4(fromEl, filename, onDone) {
+    svgToCanvas(fromEl, function (canvas, w, h) {
+      if (!canvas) { alert("PDF 내보내기에 실패했습니다. 다시 시도해 주세요."); if (onDone) onDone(); return; }
+      try {
+        var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+        var orientation = w >= h ? "l" : "p";
+        var pdf = new jsPDFCtor({ orientation: orientation, unit: "mm", format: "a4" });
+        var pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight();
+        var margin = 10;
+        var ratio = Math.min((pageW - margin * 2) / w, (pageH - margin * 2) / h);
+        var imgW = w * ratio, imgH = h * ratio;
+        var x = (pageW - imgW) / 2, y = (pageH - imgH) / 2;
+        pdf.addImage(canvas.toDataURL("image/png"), "PNG", x, y, imgW, imgH);
+        pdf.save(filename);
+      } catch (e) { alert("PDF 내보내기에 실패했습니다. 다시 시도해 주세요."); }
+      if (onDone) onDone();
+    });
   }
   function exportSVG() {
     var wasSelected = state.selectedId; state.selectedId = null; renderSVG();
@@ -2354,6 +2410,12 @@
   function exportPNG() {
     var wasSelected = state.selectedId; state.selectedId = null; renderSVG();
     svgToPng(svgEl, "tree-diagram.png", function () { state.selectedId = wasSelected; renderSVG(); });
+  }
+  function exportPDF() {
+    var wasSelected = state.selectedId; state.selectedId = null; renderSVG();
+    var title = ((state.currentDocTitle || document.getElementById("docTitleInput").value || "tree-diagram") + "").trim() || "tree-diagram";
+    var safeName = title.replace(/[\\/:*?"<>|]/g, "_");
+    svgToPdfA4(svgEl, safeName + ".pdf", function () { state.selectedId = wasSelected; renderSVG(); });
   }
 
   // ---------------------------------------------------------------------
@@ -2439,6 +2501,7 @@
     });
     var name = (getItemById(id) && getItemById(id).text ? getItemById(id).text.slice(0, 30) : "branch").replace(/[\\/:*?"<>|]/g, "_");
     if (format === "svg") downloadBlob(serializeSvg(tmpSvg), "image/svg+xml;charset=utf-8", name + ".svg");
+    else if (format === "pdf") svgToPdfA4(tmpSvg, name + ".pdf", function () {});
     else svgToPng(tmpSvg, name + ".png", function () {});
   }
   function copyBranchToLibrary(id) {
@@ -3216,6 +3279,7 @@
   document.getElementById("exportOutlineCopyBtn").addEventListener("click", copyOutlineText);
   document.getElementById("exportOutlineBtn").addEventListener("click", exportOutlineText);
   document.getElementById("exportSvgBtn").addEventListener("click", exportSVG);
+  document.getElementById("exportPdfBtn").addEventListener("click", exportPDF);
   document.getElementById("exportPngBtn").innerHTML = ICONS.download + "<span>PNG 내보내기</span>";
   document.getElementById("exportPngBtn").addEventListener("click", exportPNG);
 
