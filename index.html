@@ -59,6 +59,23 @@
   .exportOmitLabel { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--gray-700); cursor: pointer; white-space: nowrap; }
   .exportOmitLabel input { accent-color: var(--ink); }
 
+  /* 텍스트 트리 미리보기: 줄바꿈 없이 가로 스크롤 → 트리 선이 깨지지 않음 */
+  .treeOpts { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .treeOptRow { display: flex; gap: 8px; }
+  .treeOptRow > label { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--gray-500); }
+  .treeChecks { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  .treePre { margin: 0; padding: 12px 14px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; font-family: "D2Coding", "Sarasa Mono K", ui-monospace, "SF Mono", Menlo, Consolas, "Noto Sans Mono CJK KR", monospace; font-size: 12.5px; line-height: 1.55; white-space: pre; overflow: auto; max-height: 50vh; tab-size: 4; -webkit-text-size-adjust: none; color: var(--ink); }
+  .treeMeta { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 8px 0 12px; font-size: 11px; color: var(--gray-500); font-family: ui-monospace, monospace; }
+  .treeFoot { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  @media (max-width: 640px) { .treePre { font-size: 12px; padding: 10px; } }
+  .treePresets { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--gray-200); }
+  .treePreset { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--gray-100); flex-wrap: wrap; }
+  .treePreset:last-child { border-bottom: none; }
+  .treePresetInfo { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 180px; }
+  .treePresetName { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .treePresetHint { font-size: 11px; color: var(--gray-500); line-height: 1.5; }
+  .treePresetBtns { display: flex; gap: 6px; flex-shrink: 0; }
+
   /* ================= LIBRARY SCREEN ================= */
   #libHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--gray-200); flex-wrap: wrap; }
   .libTitleRow { display: flex; align-items: baseline; gap: 9px; }
@@ -441,6 +458,7 @@
               </label>
               <button id="exportOutlineCopyBtn" class="tbtn" title="클립보드로 복사">복사</button>
               <button id="exportOutlineBtn" class="tbtn" title="현재 아웃라인을 텍스트 파일로 내보내기">파일로</button>
+              <button id="exportTreeTextBtn" class="tbtn" title="├── └── 형태의 텍스트 트리로 보기 · 복사">텍스트 트리</button>
             </div>
             <span class="tbar-divider"></span>
             <div class="exportGroup" title="다이어그램을 이미지·문서로 내보내기">
@@ -480,6 +498,7 @@
   <div class="overlay" id="nbTocOverlay"><div class="modalPanel" id="nbTocPanel"></div></div>
   <div class="overlay" id="bulkOverlay"><div class="modalPanel" id="bulkPanel"></div></div>
   <div class="overlay" id="importOverlay"><div class="modalPanel" id="importPanel"></div></div>
+  <div class="overlay" id="treeTextOverlay"><div class="modalPanel wide" id="treeTextPanel"></div></div>
   <div class="overlay" id="mdOverlay"><div class="modalPanel mdModalPanel" id="mdPanel"></div></div>
 
 </div>
@@ -2484,6 +2503,195 @@
     }
   }
 
+  // ---------------------------------------------------------------------
+  // 텍스트 트리(├── └──) 생성 · 복사
+  // - 긴 문장은 화면/지정 폭에 맞춰 자동 줄바꿈하고, 줄바꿈된 줄에도 트리 선(│)을 이어 붙여 구조가 깨지지 않게 함
+  // - 한글·전각 문자는 2칸으로 계산
+  // ---------------------------------------------------------------------
+  var TREE_STYLES = {
+    box:     { label: "├── 표준", vert: "│   ", blank: "    ", tee: "├── ", elbow: "└── " },
+    compact: { label: "├ 좁게 (폭 절약)", vert: "│ ", blank: "  ", tee: "├ ", elbow: "└ " },
+    ascii:   { label: "|-- ASCII (어디서나)", vert: "|   ", blank: "    ", tee: "|-- ", elbow: "`-- " }
+  };
+  var TREE_WIDTHS = [["auto", "자동 (화면 폭)"], ["0", "무제한"], ["24", "24칸"], ["32", "32칸"], ["40", "40칸"], ["50", "50칸"], ["60", "60칸"], ["80", "80칸"]];
+  var treeTextOpts = { style: "ascii", width: "auto", omitRoot: false, notes: true, fence: true };   // 기본: ASCII + 코드블록 (어디에 붙여넣어도 가장 안 깨짐)
+  var treePreEl = null, treeMetaEl = null;
+
+  function charCols(cp) {
+    if ((cp >= 0x1100 && cp <= 0x115F) || (cp >= 0x2E80 && cp <= 0xA4CF) || (cp >= 0xAC00 && cp <= 0xD7A3) ||
+        (cp >= 0xF900 && cp <= 0xFAFF) || (cp >= 0xFE30 && cp <= 0xFE6F) || (cp >= 0xFF00 && cp <= 0xFF60) ||
+        (cp >= 0xFFE0 && cp <= 0xFFE6) || cp >= 0x1F300) return 2;
+    return 1;
+  }
+  function dispWidth(s) { var w = 0; Array.from(String(s)).forEach(function (c) { w += charCols(c.codePointAt(0)); }); return w; }
+  function wrapByWidth(text, avail) {
+    var out = [];
+    String(text).split("\n").forEach(function (para) {
+      if (!avail || dispWidth(para) <= avail) { out.push(para); return; }
+      var line = "", lineW = 0;
+      function flush() { out.push(line.replace(/\s+$/, "")); line = ""; lineW = 0; }
+      para.split(/(\s+)/).forEach(function (tok) {
+        if (tok === "") return;
+        var tw = dispWidth(tok);
+        if (/^\s+$/.test(tok)) { if (lineW > 0 && lineW + tw <= avail) { line += tok; lineW += tw; } return; }
+        if (lineW + tw <= avail) { line += tok; lineW += tw; return; }
+        if (lineW > 0) flush();
+        if (tw <= avail) { line = tok; lineW = tw; return; }
+        Array.from(tok).forEach(function (c) {           // 폭보다 긴 단어는 글자 단위로 분할
+          var cw = charCols(c.codePointAt(0));
+          if (lineW + cw > avail && lineW > 0) flush();
+          line += c; lineW += cw;
+        });
+      });
+      if (line !== "") flush();
+    });
+    return out;
+  }
+  function buildTreeText(opts, cols) {
+    var st = TREE_STYLES[opts.style] || TREE_STYLES.box;
+    var W = cols > 0 ? cols : 0;
+    var items = outlineExportItems(opts.omitRoot).filter(function (it, idx, arr) {
+      return (it.text || "").trim() || (arr[idx + 1] && arr[idx + 1].level > it.level);   // 빈 말단 항목은 제외
+    });
+    var n = items.length, lines = [], guides = [];
+    function emit(text, firstPrefix, restPrefix) {
+      var avail = W ? Math.max(8, W - dispWidth(firstPrefix)) : 0;
+      wrapByWidth(text, avail).forEach(function (ln, i) { lines.push(((i === 0 ? firstPrefix : restPrefix) + ln).replace(/\s+$/, "")); });
+    }
+    for (var i = 0; i < n; i++) {
+      var it = items[i], L = it.level, hasNext = false;
+      for (var j = i + 1; j < n; j++) { if (items[j].level <= L) { hasNext = items[j].level === L; break; } }
+      var text = (it.text || "").trim();
+      if (it.checkbox) text = (it.checked ? "[x] " : "[ ] ") + text;
+      var guidePrefix = "";
+      for (var l = 1; l < L; l++) guidePrefix += guides[l] ? st.vert : st.blank;
+      var first, rest;
+      if (L === 0) { if (i > 0) lines.push(""); first = ""; rest = ""; }
+      else { first = guidePrefix + (hasNext ? st.tee : st.elbow); rest = guidePrefix + (hasNext ? st.vert : st.blank); }
+      guides[L] = hasNext;
+      emit(text, first, rest);
+      if (opts.notes) {
+        var notePrefix = rest + (L === 0 ? "  " : "");
+        noteLinesForExport(it).forEach(function (nl) {
+          if (String(nl).trim()) emit(String(nl).trim(), notePrefix + "· ", notePrefix + "  ");
+        });
+      }
+    }
+    return lines.join("\n");
+  }
+  function treeAutoCols() {
+    if (!treePreEl) return 0;
+    var cs = getComputedStyle(treePreEl);
+    var ctx = document.createElement("canvas").getContext("2d");
+    ctx.font = cs.fontSize + " " + cs.fontFamily;
+    var cw = ctx.measureText("0").width || 7;
+    var inner = treePreEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    return Math.max(16, Math.floor(inner / cw) - 1);
+  }
+  // override: 빠른 복사/저장 프리셋용으로 선 모양·코드블록 여부만 덮어쓸 때 사용
+  function currentTreeOutput(override) {
+    var o = Object.assign({}, treeTextOpts, override || {});
+    var cols = o.width === "auto" ? treeAutoCols() : (parseInt(o.width, 10) || 0);
+    var body = buildTreeText(o, cols);
+    return { text: o.fence ? "```\n" + body + "\n```" : body, cols: cols, lines: body ? body.split("\n").length : 0 };
+  }
+  function copyTextWithFlash(text, btn, doneLabel) {
+    var orig = btn.textContent;
+    function flash() { btn.textContent = doneLabel || "복사됨!"; setTimeout(function () { btn.textContent = orig; }, 1100); }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(flash, function () { fallbackCopyText(text); flash(); });
+    else { fallbackCopyText(text); flash(); }
+  }
+  function treeFileBase() {
+    var title = ((state.currentDocTitle || document.getElementById("docTitleInput").value || "tree") + "").trim() || "tree";
+    return title.replace(/[\\/:*?"<>|]/g, "_");
+  }
+  function refreshTreePreview() {
+    if (!treePreEl) return;
+    var res = currentTreeOutput();
+    treePreEl.textContent = res.text || "(내용이 없습니다)";
+    treeMetaEl.textContent = res.lines + "줄 · " + (res.cols ? "폭 " + res.cols + "칸" : "폭 제한 없음");
+  }
+  function openTreeTextModal() {
+    var overlayEl = document.getElementById("treeTextOverlay"), panel = document.getElementById("treeTextPanel");
+    panel.innerHTML = "";
+    var head = document.createElement("div"); head.className = "modal-head";
+    head.innerHTML = '<span class="eyebrow" style="color:var(--ink)">텍스트 트리</span>';
+    var closeBtn = document.createElement("button"); closeBtn.className = "close-x"; closeBtn.innerHTML = ICONS.x;
+    closeBtn.addEventListener("click", function () { overlayEl.classList.remove("show"); });
+    head.appendChild(closeBtn); panel.appendChild(head);
+
+    var opts = document.createElement("div"); opts.className = "treeOpts";
+    function selectField(label, options, current, onChange) {
+      var wrap = document.createElement("label"); wrap.appendChild(document.createTextNode(label));
+      var sel = document.createElement("select"); sel.className = "npSelect";
+      options.forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
+      sel.value = current; sel.addEventListener("change", function () { onChange(sel.value); refreshTreePreview(); });
+      wrap.appendChild(sel); return wrap;
+    }
+    function checkField(label, key) {
+      var lb = document.createElement("label"); lb.className = "npToggle";
+      var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!treeTextOpts[key];
+      cb.addEventListener("change", function () { treeTextOpts[key] = cb.checked; refreshTreePreview(); });
+      lb.appendChild(cb); lb.appendChild(document.createTextNode(label)); return lb;
+    }
+    var row = document.createElement("div"); row.className = "treeOptRow";
+    row.appendChild(selectField("선 모양", Object.keys(TREE_STYLES).map(function (k) { return [k, TREE_STYLES[k].label]; }), treeTextOpts.style, function (v) { treeTextOpts.style = v; }));
+    row.appendChild(selectField("줄바꿈 폭", TREE_WIDTHS, treeTextOpts.width, function (v) { treeTextOpts.width = v; }));
+    opts.appendChild(row);
+    var checks = document.createElement("div"); checks.className = "treeChecks";
+    checks.appendChild(checkField("최상위 제외", "omitRoot"));
+    checks.appendChild(checkField("노트 포함", "notes"));
+    checks.appendChild(checkField("코드블록(```)으로 감싸기", "fence"));
+    opts.appendChild(checks);
+    panel.appendChild(opts);
+
+    treePreEl = document.createElement("pre"); treePreEl.className = "treePre"; panel.appendChild(treePreEl);
+    treeMetaEl = document.createElement("div"); treeMetaEl.className = "treeMeta"; panel.appendChild(treeMetaEl);
+
+    // 현재 화면 설정 그대로 복사/저장
+    var foot = document.createElement("div"); foot.className = "treeFoot";
+    var saveBtn = document.createElement("button"); saveBtn.className = "tbtn"; saveBtn.textContent = "TXT 저장";
+    saveBtn.addEventListener("click", function () {
+      downloadBlob(currentTreeOutput().text, "text/plain;charset=utf-8", treeFileBase() + "-tree.txt");
+    });
+    var copyBtn = document.createElement("button"); copyBtn.className = "primary-btn"; copyBtn.textContent = "복사";
+    copyBtn.addEventListener("click", function () { copyTextWithFlash(currentTreeOutput().text, copyBtn); });
+    foot.appendChild(saveBtn); foot.appendChild(copyBtn); panel.appendChild(foot);
+
+    // 빠른 복사/저장: 선 모양·코드블록만 바꿔서 한 번에 (줄바꿈 폭·노트·최상위 제외는 위 설정 그대로)
+    var presetBox = document.createElement("div"); presetBox.className = "treePresets";
+    var presetTitle = document.createElement("span"); presetTitle.className = "modal-section-title"; presetTitle.textContent = "붙여넣을 곳에 맞춰 바로 복사";
+    presetBox.appendChild(presetTitle);
+    [
+      { label: "코드블록 (```)", hint: "선 모양은 위 설정 · Notion, GitHub, 마크다운 앱용", ov: { fence: true }, ext: ".md" },
+      { label: "ASCII", hint: "|-- 선 · 코드블록 없이 일반 텍스트로", ov: { style: "ascii", fence: false }, ext: ".txt" },
+      { label: "ASCII + 코드블록", hint: "기본값 · 가장 안 깨지는 조합 · 메신저, 이슈, 문서 어디서나", ov: { style: "ascii", fence: true }, ext: ".md" }
+    ].forEach(function (pr) {
+      var row = document.createElement("div"); row.className = "treePreset";
+      var info = document.createElement("div"); info.className = "treePresetInfo";
+      info.innerHTML = '<span class="treePresetName"></span><span class="treePresetHint"></span>';
+      info.firstChild.textContent = pr.label; info.lastChild.textContent = pr.hint;
+      var btns = document.createElement("div"); btns.className = "treePresetBtns";
+      var cBtn = document.createElement("button"); cBtn.className = "tbtn"; cBtn.textContent = "복사";
+      cBtn.addEventListener("click", function () { copyTextWithFlash(currentTreeOutput(pr.ov).text, cBtn); });
+      var sBtn = document.createElement("button"); sBtn.className = "tbtn"; sBtn.textContent = pr.ext + " 저장";
+      sBtn.addEventListener("click", function () {
+        var suffix = (pr.ov.style === "ascii" ? "-ascii" : "-tree") + (pr.ov.fence ? "-codeblock" : "");
+        downloadBlob(currentTreeOutput(pr.ov).text, "text/plain;charset=utf-8", treeFileBase() + suffix + pr.ext);
+      });
+      btns.appendChild(cBtn); btns.appendChild(sBtn);
+      row.appendChild(info); row.appendChild(btns); presetBox.appendChild(row);
+    });
+    panel.appendChild(presetBox);
+
+    overlayEl.classList.add("show");
+    refreshTreePreview();
+  }
+  document.getElementById("treeTextOverlay").addEventListener("click", function (e) { if (e.target === e.currentTarget) e.currentTarget.classList.remove("show"); });
+  window.addEventListener("resize", function () {
+    if (document.getElementById("treeTextOverlay").classList.contains("show") && treeTextOpts.width === "auto") refreshTreePreview();
+  });
+
   function extractBranchItems(id) {
     var idx = indexOfId(id);
     if (idx < 0) return null;
@@ -3278,6 +3486,7 @@
   document.getElementById("zoomReset").addEventListener("click", function () { state.zoom = 1; applyZoom(); });
   document.getElementById("exportOutlineCopyBtn").addEventListener("click", copyOutlineText);
   document.getElementById("exportOutlineBtn").addEventListener("click", exportOutlineText);
+  document.getElementById("exportTreeTextBtn").addEventListener("click", openTreeTextModal);
   document.getElementById("exportSvgBtn").addEventListener("click", exportSVG);
   document.getElementById("exportPdfBtn").addEventListener("click", exportPDF);
   document.getElementById("exportPngBtn").innerHTML = ICONS.download + "<span>PNG 내보내기</span>";
