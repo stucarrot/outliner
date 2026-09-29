@@ -402,7 +402,7 @@
             <span>아웃라인 붙여넣기</span>
           </button>
           <div id="pasteWrap">
-            <textarea id="pasteBox" spellcheck="false" placeholder="다이날리스트에서 'Copy as Formatted'로 복사한 내용을 여기에 붙여넣으세요."></textarea>
+            <textarea id="pasteBox" spellcheck="false" placeholder="다이날리스트에서 'Copy as Formatted'로 복사한 내용, 또는 이 앱의 '텍스트 트리'로 내보낸 내용을 여기에 붙여넣으세요."></textarea>
             <button id="importBtn" class="primary-btn"></button>
             <p class="paste-hint">탭(또는 하이픈 들여쓰기)으로 된 다이날리스트 · 워크플로위 형식 텍스트를 인식합니다. 항목에 딸린 노트(메모) 줄은 자동으로 작은 글씨 메모로 들어갑니다.</p>
           </div>
@@ -665,6 +665,9 @@
         } else { items.push({ id: nextId(), text: l.content.trim(), level: lvl, note: "" }); }
       } else { items.push({ id: nextId(), text: l.content.replace(bulletRe, "$1").trim(), level: lvl, note: "" }); }
     });
+    return normalizeLevels(items);
+  }
+  function normalizeLevels(items) {
     var norm = [];
     var prevLevel = -1;
     items.forEach(function (it) {
@@ -674,6 +677,92 @@
       prevLevel = lvl;
     });
     return norm;
+  }
+
+  // ---------------------------------------------------------------------
+  // "텍스트 트리"(├──/└──, |--/`--, 압축형)로 내보낸 글을 다시 편집 가능한
+  // 아웃라인으로 되돌리는 파서. 트리 연결선이 하나도 안 보이면 null을 돌려줘서
+  // 위의 Dynalist 스타일 파서로 자연스럽게 넘어가게 함.
+  // ---------------------------------------------------------------------
+  var TREE_MARKER_CANDIDATES = [
+    ["├── ", "tee"], ["└── ", "elbow"],
+    ["|-- ", "tee"], ["`-- ", "elbow"],
+    ["├ ", "tee"], ["└ ", "elbow"],
+    ["|--", "tee"], ["`--", "elbow"],
+    ["├", "tee"], ["└", "elbow"]
+  ];
+  function matchTreeMarker(s) {
+    for (var k = 0; k < TREE_MARKER_CANDIDATES.length; k++) {
+      if (s.indexOf(TREE_MARKER_CANDIDATES[k][0]) === 0) return TREE_MARKER_CANDIDATES[k];
+    }
+    return null;
+  }
+  function stripTreeLinePrefix(line) {
+    // ASCII 스타일은 세로 이음선과 tee/elbow 마커가 둘 다 "|"로 시작해 겹치므로,
+    // 한 글자씩 소비하기 전에 그 위치에서 마커가 시작되는지 먼저 확인한다.
+    var i = 0;
+    while (i < line.length && !matchTreeMarker(line.slice(i)) && (line[i] === " " || line[i] === "\t" || line[i] === "│" || line[i] === "|")) i++;
+    var fillLen = i, rest = line.slice(i), marker = null, markerLen = 0;
+    var hit = matchTreeMarker(rest);
+    if (hit) { marker = hit[1]; markerLen = hit[0].length; }
+    return { fillLen: fillLen, marker: marker, prefixLen: fillLen + markerLen, content: rest.slice(markerLen) };
+  }
+  function parseTreeDiagramText(raw) {
+    var text = raw.replace(/\r\n/g, "\n");
+    var fenced = text.match(/^\s*```[a-zA-Z0-9]*\n([\s\S]*?)\n?```\s*$/);
+    if (fenced) text = fenced[1];
+    var rawLines = text.split("\n");
+    var parsedLines = rawLines.map(function (line) {
+      if (line.trim() === "") return { blank: true };
+      var p = stripTreeLinePrefix(line);
+      return { blank: false, prefixLen: p.prefixLen, marker: p.marker, content: p.content.replace(/\s+$/, "") };
+    });
+    var hasMarker = parsedLines.some(function (l) { return !l.blank && l.marker; });
+    if (!hasMarker) return null;      // 텍스트 트리 형식이 아닌 것 같음 → 다른 파서에 맡김
+
+    var unit = null;
+    parsedLines.forEach(function (l) {
+      if (!l.blank && l.marker && l.prefixLen > 0 && (unit === null || l.prefixLen < unit)) unit = l.prefixLen;
+    });
+    if (!unit) unit = 4;
+
+    var items = [];
+    var lastTarget = null;   // { kind: 'text'|'note', ref: item } — 줄바꿈으로 이어진 다음 줄을 어디에 붙일지
+    var prevWasBlank = true;
+    parsedLines.forEach(function (l) {
+      if (l.blank) { prevWasBlank = true; return; }
+      var content = l.content;
+      if (!content.trim()) { prevWasBlank = true; return; }
+      if (l.marker) {
+        var lvl = Math.max(0, Math.round(l.prefixLen / unit));
+        var t = content.trim();
+        var cb = t.match(/^\[( |x|X)\]\s*(.*)$/);
+        var item = { id: nextId(), text: t, level: lvl, note: "" };
+        if (cb) { item.checkbox = true; item.checked = cb[1].toLowerCase() === "x"; item.text = cb[2]; }
+        items.push(item);
+        lastTarget = { kind: "text", ref: item };
+      } else if (/^·\s?/.test(content.trim())) {
+        var noteText = content.trim().replace(/^·\s?/, "");
+        if (items.length) {
+          var owner = items[items.length - 1];
+          owner.note = owner.note ? (owner.note + "\n" + noteText) : noteText;
+          lastTarget = { kind: "note", ref: owner };
+        }
+      } else if (l.prefixLen === 0 && prevWasBlank) {
+        var rootItem = { id: nextId(), text: content.trim(), level: 0, note: "" };
+        items.push(rootItem);
+        lastTarget = { kind: "text", ref: rootItem };
+      } else if (lastTarget) {
+        if (lastTarget.kind === "note") lastTarget.ref.note = (lastTarget.ref.note + " " + content.trim()).trim();
+        else lastTarget.ref.text = (lastTarget.ref.text + " " + content.trim()).trim();
+      } else {
+        var soloItem = { id: nextId(), text: content.trim(), level: 0, note: "" };
+        items.push(soloItem);
+        lastTarget = { kind: "text", ref: soloItem };
+      }
+      prevWasBlank = false;
+    });
+    return items.length ? normalizeLevels(items) : null;
   }
 
   function importFromPaste() {
@@ -686,7 +775,7 @@
         : "현재 다이어그램을 붙여넣은 텍스트로 교체합니다. 계속할까요?";
       if (!window.confirm(msg)) return;
     }
-    var parsed = parseOutlineText(raw);
+    var parsed = parseTreeDiagramText(raw) || parseOutlineText(raw);
     if (parsed.length === 0) return;
     state.items = parsed;
     state.selectedId = null;
